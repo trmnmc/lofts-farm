@@ -16,10 +16,12 @@ public final class FarmCommand implements CommandExecutor {
 
     private final Plugin plugin;
     private final FarmService farms;
+    private final BoardGui board;
 
-    public FarmCommand(Plugin plugin, FarmService farms) {
+    public FarmCommand(Plugin plugin, FarmService farms, BoardGui board) {
         this.plugin = plugin;
         this.farms = farms;
+        this.board = board;
     }
 
     @Override
@@ -97,12 +99,14 @@ public final class FarmCommand implements CommandExecutor {
                 }
                 player.sendMessage(P + "Laid " + made + " farmland blocks. Sow with a seed in hand.");
             }
+            case "board" -> board.open(player);
             default -> {
                 player.sendMessage(P + "\u00A7eLoftsFarm slice");
                 player.sendMessage(P + "/farm setup \u00A78- lay a test plot (op)");
                 player.sendMessage(P + "/farm give <wheat|carrot|fert>");
                 player.sendMessage(P + "/farm balance");
                 player.sendMessage(P + "/farm sell \u00A78- sell everything in farm storage");
+                player.sendMessage(P + "/farm board \u00A78- the order board");
                 player.sendMessage(P + "\u00A78Right-click farmland to sow, a ripe crop to harvest.");
             }
         }

@@ -12,9 +12,12 @@ public final class LoftsFarmPlugin extends JavaPlugin {
         this.scheduler = new GrowthScheduler(this);
         this.farms = new FarmService(this, scheduler);
         farms.load();
+        OrderService orders = new OrderService(farms);
+        BoardGui board = new BoardGui(farms, orders);
         getServer().getPluginManager().registerEvents(new FarmListener(this, farms), this);
+        getServer().getPluginManager().registerEvents(board, this);
         var cmd = getCommand("farm");
-        if (cmd != null) cmd.setExecutor(new FarmCommand(this, farms));
+        if (cmd != null) cmd.setExecutor(new FarmCommand(this, farms, board));
         getLogger().info("LoftsFarm v2 slice enabled. v1 economy untouched.");
     }
 
