@@ -1906,7 +1906,7 @@ git commit -m "feat(loftsfarm): slice commands for seeds, balance, selling and t
 - Consumes: `Order`, `OrderLine`, `Crop`, `Storage`, `FarmService`.
 - Produces:
   - `OrderService` with `Order currentFor(UUID)`, `void refreshIfExpired(UUID)`, `boolean deliver(UUID, Player)`.
-  - `BoardGui` with `void open(Player)` and `boolean handleClick(Player, int slot)`; it implements `Listener` for `InventoryClickEvent`.
+  - `BoardGui` with `void open(Player)`; it implements `Listener` and handles `InventoryClickEvent` and `InventoryDragEvent`, identifying its own inventory by a private `InventoryHolder` rather than by title string.
 
 - [ ] **Step 1: Write the order service**
 
