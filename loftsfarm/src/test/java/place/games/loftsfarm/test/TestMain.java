@@ -8,6 +8,7 @@ public final class TestMain {
         SeedStackTest.run();
         OrderTest.run();
         StateCodecTest.run();
+        FarmStateTest.run();
         System.exit(Check.report());
     }
 }

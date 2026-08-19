@@ -37,35 +37,48 @@ public final class FarmCommand implements CommandExecutor {
                 if (what.startsWith("fert")) {
                     var fert = Items.fertiliser(plugin);
                     fert.setAmount(16);
-                    player.getInventory().addItem(fert);
-                    player.sendMessage(P + "16 fertiliser.");
+                    var leftover = player.getInventory().addItem(fert);
+                    if (leftover.isEmpty()) {
+                        player.sendMessage(P + "16 fertiliser.");
+                    } else {
+                        for (var stack : leftover.values()) {
+                            player.getWorld().dropItemNaturally(player.getLocation(), stack);
+                        }
+                        player.sendMessage(P + "Your inventory was full, so it's on the ground.");
+                    }
                 } else {
                     Crop crop = Crop.byId(what);
                     if (crop == null) {
                         player.sendMessage(P + "Unknown crop. Try wheat, carrot, or fert.");
                         return true;
                     }
-                    player.getInventory().addItem(Items.seed(plugin, SeedStack.fresh(crop)));
-                    player.sendMessage(P + "One " + crop.displayName()
-                            + " seed \u2014 " + crop.plantings() + " plantings in it.");
+                    var leftover = player.getInventory().addItem(Items.seed(plugin, SeedStack.fresh(crop)));
+                    if (leftover.isEmpty()) {
+                        player.sendMessage(P + "One " + crop.displayName()
+                                + " seed \u2014 " + crop.plantings() + " plantings in it.");
+                    } else {
+                        for (var stack : leftover.values()) {
+                            player.getWorld().dropItemNaturally(player.getLocation(), stack);
+                        }
+                        player.sendMessage(P + "Your inventory was full, so it's on the ground.");
+                    }
                 }
             }
             case "balance" -> player.sendMessage(P + "Balance: \u00A7f$" + st.wallet().balance());
             case "sell" -> {
-                long total = 0L;
-                for (Crop c : Crop.values()) {
-                    int n = st.storage().count(c);
-                    if (n > 0 && st.storage().take(c, n)) {
-                        long gross = n * c.rawValue();
-                        st.wallet().credit(gross);
-                        total += gross;
-                        player.sendMessage(P + "Sold " + n + " \u00D7 " + c.displayName()
-                                + " for \u00A7f$" + gross);
+                var sold = st.sellAll();
+                if (sold.isEmpty()) {
+                    player.sendMessage(P + "Nothing in farm storage.");
+                } else {
+                    long total = 0L;
+                    for (var entry : sold.entrySet()) {
+                        player.sendMessage(P + "Sold " + entry.getKey().displayName()
+                                + " for \u00A7f$" + entry.getValue());
+                        total += entry.getValue();
                     }
+                    player.sendMessage(P + "Total \u00A7f$" + total
+                            + "\u00A77. Balance \u00A7f$" + st.wallet().balance());
                 }
-                if (total == 0L) player.sendMessage(P + "Nothing in farm storage.");
-                else player.sendMessage(P + "Total \u00A7f$" + total
-                        + "\u00A77. Balance \u00A7f$" + st.wallet().balance());
             }
             case "setup" -> {
                 if (!player.isOp()) {

@@ -1,5 +1,6 @@
 package place.games.loftsfarm.domain;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,4 +20,22 @@ public final class FarmState {
 
     public void put(PlantRecord r) { plants.put(r.key(), r); }
     public PlantRecord remove(String key) { return plants.remove(key); }
+
+    /**
+     * Sells every crop in storage at its raw value, crediting the wallet.
+     * Returns a per-crop record of what sold, so callers can report it.
+     * Storage is emptied only for crops that actually sold.
+     */
+    public Map<Crop, Long> sellAll() {
+        Map<Crop, Long> sold = new EnumMap<>(Crop.class);
+        for (Crop c : Crop.values()) {
+            int n = storage.count(c);
+            if (n > 0 && storage.take(c, n)) {
+                long gross = (long) n * c.rawValue();
+                wallet.credit(gross);
+                sold.put(c, gross);
+            }
+        }
+        return sold;
+    }
 }
