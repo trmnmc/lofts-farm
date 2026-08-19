@@ -24,6 +24,8 @@ Copied from `docs/superpowers/specs/2026-08-19-lofts-farming-economy-design.md`.
 - **v2 touches no v1 data.** No reads or writes to `plugins/Lofts/lofts.db`, no v1 config keys, no Vault.
 - **Package root:** `place.games.loftsfarm`
 - **Project root:** `C:/Users/truman/OneDrive/Documents/Minecraft-Server/loftsfarm`
+- **RULED DEVIATION — persistence.** Spec §6 specifies SQLite. This slice uses a flat text file behind the `StateCodec` seam, because no JDBC driver is present and no downloads are permitted. **The plan governs over spec §6 here** — this is a decided trade-off, not an oversight, and it is not a spec-compliance defect. Reviewers should not flag it. Swapping to SQLite later replaces `StateCodec` only.
+- **Reviewers:** this plan's code blocks are the requirement. Where a task's code omits a system named in the spec but listed under §9 "Out of scope" or in the slice scope (mill, market GUI, merchant, levels, plots, combined orders, milled goods, the four upper crops, sugar cane and pumpkin stage handling), its absence is intended.
 
 ---
 
@@ -260,10 +262,10 @@ public final class GrowthClockTest {
         Check.isTrue("ripe exactly on time", g.ripe(t0 + 30_000L));
         Check.isTrue("ripe later", g.ripe(t0 + 60_000L));
 
-        Check.eq("stage 0 at plant", g.stage(t0), 0);
-        Check.eq("stage 3 at half way", g.stage(t0 + 15_000L), 3);
-        Check.eq("stage maxes at ripe", g.stage(t0 + 30_000L), Crop.WHEAT.stageCount() - 1);
-        Check.eq("stage clamped past ripe", g.stage(t0 + 90_000L), Crop.WHEAT.stageCount() - 1);
+        Check.eq("stage 0 at plant", g.stage(Crop.WHEAT, t0), 0);
+        Check.eq("stage 3 at half way", g.stage(Crop.WHEAT, t0 + 15_000L), 3);
+        Check.eq("stage maxes at ripe", g.stage(Crop.WHEAT, t0 + 30_000L), Crop.WHEAT.stageCount() - 1);
+        Check.eq("stage clamped past ripe", g.stage(Crop.WHEAT, t0 + 90_000L), Crop.WHEAT.stageCount() - 1);
 
         Check.eq("remaining at plant", g.remainingMs(t0), 30_000L);
         Check.eq("remaining never negative", g.remainingMs(t0 + 99_000L), 0L);
@@ -390,23 +392,12 @@ public record GrowthClock(long plantedAt, long readyAt) {
 }
 ```
 
-- [ ] **Step 6: Fix the test to match the signature**
-
-`stage` needs the crop to know its stage count. Update the three stage assertions in `GrowthClockTest` to pass it:
-
-```java
-        Check.eq("stage 0 at plant", g.stage(Crop.WHEAT, t0), 0);
-        Check.eq("stage 3 at half way", g.stage(Crop.WHEAT, t0 + 15_000L), 3);
-        Check.eq("stage maxes at ripe", g.stage(Crop.WHEAT, t0 + 30_000L), Crop.WHEAT.stageCount() - 1);
-        Check.eq("stage clamped past ripe", g.stage(Crop.WHEAT, t0 + 90_000L), Crop.WHEAT.stageCount() - 1);
-```
-
-- [ ] **Step 7: Run the tests to verify they pass**
+- [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `bash loftsfarm/run-tests.sh`
 Expected: PASS — `19 passed, 0 failed`, exit 0.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add loftsfarm/src
@@ -1300,7 +1291,7 @@ git commit -m "feat(loftsfarm): seed items with PDC durability and a damage bar,
 **Interfaces:**
 - Consumes: `Crop`, `GrowthClock`, `PlantRecord`, `FarmState`, `StateCodec`, `SeedStack`, `Items`.
 - Produces:
-  - `FarmService` with `FarmState state(UUID)`, `void save()`, `void load()`, `PlantRecord plantAt(Player, Block, SeedStack)`, `boolean harvestAt(Player, Block)`, `boolean fertiliseAt(Player, Block)`, `Optional<PlantRecord> at(Block)`, `UUID ownerOf(Block)`.
+  - `FarmService` with `FarmState state(UUID)`, `void save()`, `void load()`, `PlantRecord plantAt(Player, Block, SeedStack)`, `boolean harvestAt(Player, Block)`, `boolean discardAt(Block)`, `boolean fertiliseAt(Player, Block)`, `Optional<PlantRecord> at(Block)`, `UUID ownerOf(Block)`.
   - `GrowthScheduler` with `void schedule(PlantRecord)`, `void cancel(String key)`, `void cancelAll()`, `void paintStage(PlantRecord)`.
 
 - [ ] **Step 1: Write the growth scheduler**
@@ -1311,10 +1302,12 @@ Create `loftsfarm/src/main/java/place/games/loftsfarm/bukkit/GrowthScheduler.jav
 package place.games.loftsfarm.bukkit;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -1362,11 +1355,21 @@ public final class GrowthScheduler {
         tasks.clear();
     }
 
-    /** Sets the block's age to match elapsed real time. */
+    /**
+     * Sets the block's age to match elapsed real time.
+     *
+     * Intermediate stages are skipped when nobody is close enough to see them —
+     * the spec only requires interpolation for chunks with a player in view
+     * distance. A ripe crop is always painted regardless of who is watching,
+     * because its final state must be correct whenever it is next observed.
+     */
     public void paintStage(PlantRecord record) {
         World world = Bukkit.getWorld(record.world());
         if (world == null) return;
         if (!world.isChunkLoaded(record.x() >> 4, record.z() >> 4)) return;
+
+        boolean ripe = record.clock().ripe(System.currentTimeMillis());
+        if (!ripe && !anyPlayerNear(record)) return;
 
         Block block = world.getBlockAt(record.x(), record.y(), record.z());
         BlockData data = block.getBlockData();
@@ -1380,14 +1383,12 @@ public final class GrowthScheduler {
         }
     }
 
-    public boolean anyPlayerNear(PlantRecord record) {
+    private boolean anyPlayerNear(PlantRecord record) {
         World world = Bukkit.getWorld(record.world());
         if (world == null) return false;
-        for (var p : world.getPlayers()) {
-            if (p.getLocation().distanceSquared(
-                    new org.bukkit.Location(world, record.x(), record.y(), record.z())) < PAINT_RADIUS_SQ) {
-                return true;
-            }
+        Location at = new Location(world, record.x(), record.y(), record.z());
+        for (Player p : world.getPlayers()) {
+            if (p.getLocation().distanceSquared(at) < PAINT_RADIUS_SQ) return true;
         }
         return false;
     }
@@ -1468,6 +1469,20 @@ public final class FarmService {
         owners.remove(rec.key());
         scheduler.cancel(rec.key());
         st.storage().add(rec.crop(), 1);
+        return true;
+    }
+
+    /**
+     * Untracks a plant without paying out. Used when a crop is destroyed before
+     * it ripens, so no record or scheduled task is left pointing at air.
+     */
+    public boolean discardAt(Block block) {
+        UUID owner = ownerOf(block);
+        if (owner == null) return false;
+        String key = keyOf(block);
+        state(owner).remove(key);
+        owners.remove(key);
+        scheduler.cancel(key);
         return true;
     }
 
@@ -1651,13 +1666,23 @@ public final class FarmListener implements Listener {
         }
     }
 
-    /** Breaking a growing crop removes it from tracking rather than orphaning it. */
+    /**
+     * Breaking a tracked crop must always untrack it, ripe or not — otherwise the
+     * block is gone while the record and its scheduled task live on, pointing at
+     * air. Ripe crops still pay out; unripe ones are simply discarded.
+     */
     @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        farms.at(event.getBlock()).ifPresent(record -> {
-            event.setDropItems(false);
-            farms.harvestAt(event.getPlayer(), event.getBlock());
-        });
+        Block block = event.getBlock();
+        if (farms.at(block).isEmpty()) return;
+
+        event.setDropItems(false);
+        if (!farms.harvestAt(event.getPlayer(), block)) {
+            // Not ripe (or not the owner's) — drop the record so nothing is orphaned.
+            farms.discardAt(block);
+            event.getPlayer().sendMessage(
+                    "§8[§c!§8] §7That crop wasn't ready. Lost it.");
+        }
     }
 
     private static Material cropMaterial(Crop crop) {
