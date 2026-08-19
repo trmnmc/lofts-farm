@@ -13,6 +13,7 @@ import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -48,6 +49,27 @@ public final class FarmListener implements Listener {
         if (farms.at(event.getBlock()).isPresent()) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * Repaints any tracked plants in a chunk the instant it (re)loads, per
+     * spec §4.1. Without this, a plant whose chunk was unloaded stays
+     * visually stuck at whatever stage it last painted -- paintStage bails
+     * silently while the chunk is unloaded, and if the plant finishes
+     * growing during that time there is no task left to correct it once the
+     * chunk comes back.
+     *
+     * Cheap by construction: this does not iterate the plant list at all.
+     * event.getChunk().getX()/getZ() are fields already on the event (no
+     * world or block access needed to get them), and
+     * FarmService#plantsInChunk turns those into a single HashMap lookup
+     * against a chunk-keyed index, so a chunk load with no tracked plants in
+     * it -- the overwhelming majority of chunk loads on this server -- costs
+     * one map lookup and nothing more.
+     */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        farms.onChunkLoad(event.getWorld().getName(), event.getChunk().getX(), event.getChunk().getZ());
     }
 
     /**

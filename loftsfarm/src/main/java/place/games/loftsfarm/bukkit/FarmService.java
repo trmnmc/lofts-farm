@@ -19,6 +19,15 @@ public final class FarmService {
     private final Map<UUID, FarmState> states = new HashMap<>();
     private final Map<String, UUID> owners = new HashMap<>();
 
+    /**
+     * Plant keys grouped by chunk, so a ChunkLoadEvent can find "any tracked
+     * plants in this chunk" with one map lookup instead of scanning every
+     * tracked plant on the server. Keyed by "world:chunkX:chunkZ", derived
+     * from a record's own stored coordinates (never by touching the world),
+     * and kept in sync at every insert/remove of a PlantRecord.
+     */
+    private final Map<String, Set<String>> plantsByChunk = new HashMap<>();
+
     public FarmService(Plugin plugin, GrowthScheduler scheduler) {
         this.plugin = plugin;
         this.scheduler = scheduler;
@@ -34,6 +43,61 @@ public final class FarmService {
 
     private static String keyOf(Block b) {
         return b.getWorld().getName() + ":" + b.getX() + ":" + b.getY() + ":" + b.getZ();
+    }
+
+    private static String chunkKeyOf(String world, int blockX, int blockZ) {
+        return world + ":" + (blockX >> 4) + ":" + (blockZ >> 4);
+    }
+
+    private void indexChunk(PlantRecord r) {
+        plantsByChunk.computeIfAbsent(chunkKeyOf(r.world(), r.x(), r.z()), k -> new HashSet<>())
+                .add(r.key());
+    }
+
+    private void unindexChunk(PlantRecord r) {
+        String chunkKey = chunkKeyOf(r.world(), r.x(), r.z());
+        Set<String> keys = plantsByChunk.get(chunkKey);
+        if (keys == null) return;
+        keys.remove(r.key());
+        if (keys.isEmpty()) plantsByChunk.remove(chunkKey);
+    }
+
+    /**
+     * Tracked plants in one chunk. O(1) average (a single map lookup plus one
+     * lookup per plant actually in that chunk) — never a scan over every
+     * tracked plant on the server. That is what makes it safe to call from a
+     * ChunkLoadEvent handler, which can fire many times per second.
+     */
+    public List<PlantRecord> plantsInChunk(String world, int chunkX, int chunkZ) {
+        Set<String> keys = plantsByChunk.get(world + ":" + chunkX + ":" + chunkZ);
+        if (keys == null || keys.isEmpty()) return List.of();
+        List<PlantRecord> result = new ArrayList<>(keys.size());
+        for (String key : keys) {
+            UUID owner = owners.get(key);
+            if (owner == null) continue;
+            PlantRecord r = state(owner).plants().get(key);
+            if (r != null) result.add(r);
+        }
+        return result;
+    }
+
+    /**
+     * Called when a chunk finishes loading. Repaints every tracked plant in
+     * that chunk to the stage its timestamp implies, and reschedules its
+     * growth chain.
+     *
+     * This is the fix for the case paintStage alone cannot cover: while a
+     * chunk is unloaded, paintStage silently bails on every attempt, and if
+     * the plant reaches readyAt during that time the chain has nothing left
+     * to schedule (it is legitimately done) — so nothing would ever repaint
+     * the block again without this hook, even though the record is correct
+     * and harvesting would succeed.
+     */
+    public void onChunkLoad(String world, int chunkX, int chunkZ) {
+        for (PlantRecord r : plantsInChunk(world, chunkX, chunkZ)) {
+            scheduler.schedule(r);
+            scheduler.paintStage(r);
+        }
     }
 
     public Optional<PlantRecord> at(Block block) {
@@ -64,6 +128,7 @@ public final class FarmService {
 
         state(player.getUniqueId()).put(record);
         owners.put(record.key(), player.getUniqueId());
+        indexChunk(record);
         scheduler.schedule(record);
         scheduler.paintStage(record);
         return record;
@@ -78,6 +143,7 @@ public final class FarmService {
 
         st.remove(rec.key());
         owners.remove(rec.key());
+        unindexChunk(rec);
         scheduler.cancel(rec.key());
         st.storage().add(rec.crop(), 1);
         return true;
@@ -91,8 +157,10 @@ public final class FarmService {
         UUID owner = ownerOf(block);
         if (owner == null) return false;
         String key = keyOf(block);
+        PlantRecord rec = state(owner).plants().get(key);
         state(owner).remove(key);
         owners.remove(key);
+        if (rec != null) unindexChunk(rec);
         scheduler.cancel(key);
         return true;
     }
@@ -171,6 +239,7 @@ public final class FarmService {
                         states.put(id, st);
                         for (PlantRecord r : st.plants().values()) {
                             owners.put(r.key(), id);
+                            indexChunk(r);
                             scheduler.schedule(r);
                             scheduler.paintStage(r);
                         }

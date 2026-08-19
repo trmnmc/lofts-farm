@@ -39,5 +39,38 @@ public final class GrowthClockTest {
 
         GrowthClock ripe = GrowthClock.start(Crop.WHEAT, t0).halved(t0 + 30_000L);
         Check.eq("halving a ripe crop is a no-op", ripe.remainingMs(t0 + 30_000L), 0L);
+
+        // Stage-boundary computation: the timestamp at which each stage
+        // becomes the correct stage() result. This is what the growth-task
+        // chain schedules against, so it must line up exactly with stage(),
+        // never drift, and its last link must land on readyAt.
+        int last = Crop.WHEAT.stageCount() - 1;
+        Check.eq("stage 0 boundary is plantedAt", g.stageBoundaryMs(Crop.WHEAT, 0), t0);
+        Check.eq("negative stage clamps to plantedAt", g.stageBoundaryMs(Crop.WHEAT, -1), t0);
+
+        long midBoundary = g.stageBoundaryMs(Crop.WHEAT, 4);
+        Check.eq("stage() at its own boundary reads that stage",
+                g.stage(Crop.WHEAT, midBoundary), 4);
+        Check.eq("one ms before a boundary still reads the previous stage",
+                g.stage(Crop.WHEAT, midBoundary - 1), 3);
+
+        Check.eq("final stage boundary lands exactly on readyAt",
+                g.stageBoundaryMs(Crop.WHEAT, last), g.readyAt());
+        Check.eq("a stage past the last one also lands on readyAt",
+                g.stageBoundaryMs(Crop.WHEAT, last + 3), g.readyAt());
+
+        // Every boundary in sequence must be non-decreasing and each must
+        // agree with stage() at the instant it fires -- this is the exact
+        // property the chained scheduler depends on to never skip or repeat
+        // a stage.
+        long previous = g.plantedAt();
+        for (int s = 1; s <= last; s++) {
+            long boundary = g.stageBoundaryMs(Crop.WHEAT, s);
+            Check.isTrue("boundary for stage " + s + " is not before the previous boundary",
+                    boundary >= previous);
+            Check.eq("stage() at boundary for stage " + s + " reads " + s,
+                    g.stage(Crop.WHEAT, boundary), s);
+            previous = boundary;
+        }
     }
 }

@@ -16,12 +16,23 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * One scheduled task per plant, firing at its readyAt. Never a sweep over all
- * plots — that is a hard constraint from the spec, because a global poll is the
- * whole performance budget at 50+ farms.
+ * One scheduled task per plant, chained one stage boundary at a time. Never a
+ * sweep over all plots — that is a hard constraint from the spec, because a
+ * global poll is the whole performance budget at 50+ farms.
+ *
+ * The crop block is its own progress bar: schedule() does not jump straight
+ * to readyAt. It schedules a task for the *next* stage boundary; when that
+ * task fires it paints the stage and, if the plant is not yet ripe, schedules
+ * the following boundary from inside the same task. That keeps exactly one
+ * live BukkitTask per plant at all times while still painting every
+ * intermediate stage, because each boundary is recomputed from
+ * plantedAt/readyAt rather than accumulated, so it cannot drift.
  *
  * Intermediate visual stages are painted only when a player is close enough to
- * see them. When nobody is nearby the block is corrected on the next paint.
+ * see them. When nobody is nearby the paint is skipped but the chain still
+ * advances, so the block is corrected the moment someone gets close (or the
+ * chunk is (re)loaded — see FarmService#onChunkLoad). A ripe crop is always
+ * painted regardless of proximity.
  */
 public final class GrowthScheduler {
     private static final double PAINT_RADIUS_SQ = 64.0 * 64.0;
@@ -35,15 +46,30 @@ public final class GrowthScheduler {
 
     public void schedule(PlantRecord record) {
         cancel(record.key());
-        long delayMs = record.clock().remainingMs(System.currentTimeMillis());
+        scheduleNextBoundary(record, System.currentTimeMillis());
+    }
+
+    /**
+     * Schedules a single task for the next stage boundary after `now`, or
+     * does nothing if the plant is already ripe (nothing left to chain).
+     * Called both from schedule() and from the fired task itself to advance
+     * the chain one link at a time.
+     */
+    private void scheduleNextBoundary(PlantRecord record, long now) {
+        if (record.clock().ripe(now)) return;
+
+        int currentStage = record.clock().stage(record.crop(), now);
+        long boundary = record.clock().stageBoundaryMs(record.crop(), currentStage + 1);
+        long delayMs = Math.max(0L, boundary - now);
         // Ceiling, not floor: a task scheduled mid-tick that floors can fire up
-        // to 49ms before readyAt, so ripe() reads false and it paints the
-        // second-to-last stage instead of the ripe one, self-removing and
-        // leaving the crop looking unripe until the next restart re-schedules it.
+        // to 49ms before the boundary, so stage() still reads the previous
+        // stage and the paint is a no-op -- leaving the crop visually stuck
+        // until the *next* boundary fires a tick later than it should.
         long ticks = Math.max(1L, (delayMs + 49L) / 50L);
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             tasks.remove(record.key());
             paintStage(record);
+            scheduleNextBoundary(record, System.currentTimeMillis());
         }, ticks);
         tasks.put(record.key(), task);
     }

@@ -56,8 +56,10 @@ design and this is a throwaway.
 21. Switch to creative mode, get a seed via `/farm give wheat`, and plant it.
     Then get a fertiliser via `/farm give fert` and apply it to a growing crop.
     PASS: sowing *does* consume a planting even in creative (item count drops from
-    8 to 7), confirming the asymmetry documented below. Fertilising *does not*
-    consume balance (balance unchanged), confirming it is correctly exempted.
+    8 to 7), confirming the asymmetry documented below. Fertilising *does*
+    still spend balance (balance drops by the usual cost) -- only the
+    fertiliser *item* is exempted from being consumed in creative, same
+    asymmetry as the seed/planting count above.
 22. Get a carrot seed via `/farm give carrot`, then right-click the air (aim at
     the sky, not a block).
     PASS: the seed is consumed as food (carrot hunger bar appears, item count
