@@ -47,9 +47,13 @@ public final class Items {
         pdc.set(usesKey(plugin), PersistentDataType.INTEGER, stack.remaining());
 
         // Drive the vanilla damage bar off remaining plantings so wear is visible.
+        // WHEAT_SEEDS/CARROT report getMaxDurability() == 0, so the max_damage data
+        // component is set explicitly (Paper 1.20.5+) to make the item damageable
+        // at all; one durability point per planting.
         if (meta instanceof Damageable dmg) {
-            int max = item.getType().getMaxDurability();
-            if (max > 0) dmg.setDamage(stack.damageFor(max));
+            int max = stack.crop().plantings();
+            dmg.setMaxDamage(max);
+            dmg.setDamage(stack.crop().plantings() - stack.remaining());
         }
 
         item.setItemMeta(meta);
@@ -64,7 +68,10 @@ public final class Items {
         if (id == null || uses == null) return null;
         Crop crop = Crop.byId(id);
         if (crop == null) return null;
-        return new SeedStack(crop, Math.min(uses, crop.plantings()));
+        // A tampered or corrupt PDC value must not be silently repaired into a
+        // legitimate-looking seed: treat it the same as "not one of ours".
+        if (uses < 1 || uses > crop.plantings()) return null;
+        return new SeedStack(crop, uses);
     }
 
     public static ItemStack fertiliser(Plugin plugin) {
