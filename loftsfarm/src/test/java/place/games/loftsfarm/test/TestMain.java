@@ -6,6 +6,7 @@ public final class TestMain {
         GrowthClockTest.run();
         WalletTest.run();
         SeedStackTest.run();
+        OrderTest.run();
         System.exit(Check.report());
     }
 }
