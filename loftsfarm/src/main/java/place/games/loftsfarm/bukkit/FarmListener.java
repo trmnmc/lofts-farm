@@ -9,9 +9,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockFadeEvent;
 import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -41,6 +43,34 @@ public final class FarmListener implements Listener {
     public FarmListener(Plugin plugin, FarmService farms) {
         this.plugin = plugin;
         this.farms = farms;
+    }
+
+    /**
+     * Farmland never reverts to dirt.
+     *
+     * v1 has this as farm.keepFarmland: "farmland in Lofts will never turn back
+     * into dirt due to dryness or trampling." Without it, the unwatered farmland
+     * /farm setup places dries out on a random tick, the crop above pops off, and
+     * onPhysics correctly discards a plant the player did nothing wrong with.
+     *
+     * Scoped to the whole world rather than to registered plots, because farmland
+     * itself is not tracked -- only crops are. That is acceptable for a dedicated
+     * flat test world; a real deployment would scope it to claimed land.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onFarmlandFade(BlockFadeEvent event) {
+        if (event.getBlock().getType() == Material.FARMLAND) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Trampling is the other route from farmland to dirt. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onTrample(EntityChangeBlockEvent event) {
+        if (event.getBlock().getType() == Material.FARMLAND
+                && event.getTo() == Material.DIRT) {
+            event.setCancelled(true);
+        }
     }
 
     /** Vanilla growth must never advance a tracked plant. */
