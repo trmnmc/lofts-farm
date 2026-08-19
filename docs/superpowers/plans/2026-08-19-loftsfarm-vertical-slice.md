@@ -229,7 +229,7 @@ git commit -m "feat(loftsfarm): build harness, test harness, loadable plugin ske
 - Consumes: `Check` from Task 1.
 - Produces:
   - `enum Crop` with constants `WHEAT`, `CARROT` and accessors `id():String`, `displayName():String`, `seedCost():long`, `growSeconds():int`, `rawValue():long`, `plantings():int`, `stageCount():int`, plus `static Crop byId(String)` returning `null` when unknown.
-  - `record GrowthClock(long plantedAt, long readyAt)` with `static GrowthClock start(Crop c, long nowMs)`, `boolean ripe(long nowMs)`, `long remainingMs(long nowMs)`, `int stage(long nowMs)`, `GrowthClock halved(long nowMs)`.
+  - `record GrowthClock(long plantedAt, long readyAt)` with `static GrowthClock start(Crop c, long nowMs)`, `boolean ripe(long nowMs)`, `long remainingMs(long nowMs)`, `int stage(Crop crop, long nowMs)`, `GrowthClock halved(long nowMs)`. Note `stage` takes the crop — a bare clock cannot know its own `stageCount`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -395,7 +395,7 @@ public record GrowthClock(long plantedAt, long readyAt) {
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `bash loftsfarm/run-tests.sh`
-Expected: PASS — `19 passed, 0 failed`, exit 0.
+Expected: PASS — `22 passed, 0 failed`, exit 0.
 
 - [ ] **Step 7: Commit**
 
