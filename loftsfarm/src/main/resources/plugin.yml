@@ -1,0 +1,10 @@
+name: LoftsFarm
+version: 0.1.0-slice
+main: place.games.loftsfarm.bukkit.LoftsFarmPlugin
+api-version: '1.21'
+description: Farm Economy v2 vertical slice. Isolated from Lofts v1.
+authors: [games.place]
+commands:
+  farm:
+    description: LoftsFarm slice commands
+    usage: /farm <help|give|balance|sell|board|setup>
