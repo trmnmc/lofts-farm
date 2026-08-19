@@ -1,5 +1,8 @@
 package place.games.loftsfarm.domain;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Hand-rolled line format. No JSON library is available in this environment and
  * no downloads are permitted, so the format is deliberately trivial:
@@ -14,6 +17,16 @@ package place.games.loftsfarm.domain;
 public final class StateCodec {
 
     private StateCodec() {}
+
+    private static List<String> lastSkipped = new ArrayList<>();
+
+    /**
+     * Return a copy of lines that were skipped during the most recent read()
+     * due to parse errors, unknown crop ids, or truncation.
+     */
+    public static List<String> lastSkipped() {
+        return new ArrayList<>(lastSkipped);
+    }
 
     public static String write(FarmState state) {
         StringBuilder sb = new StringBuilder();
@@ -31,6 +44,7 @@ public final class StateCodec {
     }
 
     public static FarmState read(String text) {
+        lastSkipped.clear();
         long cash = 0L;
         // Balance must be known before the state is constructed.
         for (String line : text.split("\n")) {
@@ -45,20 +59,43 @@ public final class StateCodec {
             String line = raw.trim();
             if (line.isEmpty()) continue;
             String[] p = line.split(" ");
-            switch (p[0]) {
-                case "stock" -> {
-                    Crop c = Crop.byId(p[1]);
-                    if (c != null) state.storage().add(c, Integer.parseInt(p[2]));
-                }
-                case "plant" -> {
-                    Crop c = Crop.byId(p[5]);
-                    if (c != null) {
-                        state.put(new PlantRecord(p[1],
-                                Integer.parseInt(p[2]), Integer.parseInt(p[3]), Integer.parseInt(p[4]),
-                                c, Long.parseLong(p[6]), Long.parseLong(p[7])));
+            try {
+                switch (p[0]) {
+                    case "stock" -> {
+                        Crop c = Crop.byId(p[1]);
+                        if (c != null) state.storage().add(c, Integer.parseInt(p[2]));
                     }
+                    case "plant" -> {
+                        // Parse the six fixed trailing fields from the end: <x> <y> <z> <cropId> <plantedAt> <readyAt>
+                        // Everything between index 1 and (length - 6) is the world name (may contain spaces).
+                        if (p.length < 8) {
+                            lastSkipped.add(line);
+                            continue;
+                        }
+                        int x = Integer.parseInt(p[p.length - 6]);
+                        int y = Integer.parseInt(p[p.length - 5]);
+                        int z = Integer.parseInt(p[p.length - 4]);
+                        String cropId = p[p.length - 3];
+                        long plantedAt = Long.parseLong(p[p.length - 2]);
+                        long readyAt = Long.parseLong(p[p.length - 1]);
+
+                        // Reconstruct world name from all tokens between 1 and (length - 6).
+                        StringBuilder worldBuilder = new StringBuilder();
+                        for (int i = 1; i < p.length - 6; i++) {
+                            if (i > 1) worldBuilder.append(' ');
+                            worldBuilder.append(p[i]);
+                        }
+                        String world = worldBuilder.toString();
+
+                        Crop c = Crop.byId(cropId);
+                        if (c != null) {
+                            state.put(new PlantRecord(world, x, y, z, c, plantedAt, readyAt));
+                        }
+                    }
+                    default -> { /* cash handled above; unknown lines ignored */ }
                 }
-                default -> { /* cash handled above; unknown lines ignored */ }
+            } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+                lastSkipped.add(line);
             }
         }
         return state;
