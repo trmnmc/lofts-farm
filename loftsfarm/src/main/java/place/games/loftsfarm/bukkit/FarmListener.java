@@ -10,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockGrowEvent;
+import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -37,7 +38,69 @@ public final class FarmListener implements Listener {
         }
     }
 
+    /**
+     * Catches crops lost to something other than a player breaking the block:
+     * water flow, pistons, trampling, explosions, WorldEdit, or farmland simply
+     * drying out from under the crop. None of those go through
+     * BlockBreakEvent, so without this, the record/owner entry/scheduled task
+     * for a destroyed crop would live on forever pointing at air -- re-saved
+     * every shutdown and rescheduled every boot, with farms.txt growing
+     * without bound.
+     *
+     * BlockPhysicsEvent is the mechanism vanilla uses to re-check "can this
+     * block still exist here" whenever a neighbour changes -- it is exactly
+     * how a crop's supporting farmland being pulled out from under it gets
+     * detected in the first place (a crop is a BushBlock; its updateShape
+     * hook, which fires through this event, is what turns it back into a
+     * dropped item when canSurvive() fails). It is not tied to *why* the
+     * neighbour changed, so it catches all of the causes above uniformly,
+     * unlike listening for one specific cause (e.g. only BlockFadeEvent, which
+     * covers farmland drying out naturally but not trampling, pistons,
+     * explosions or WorldEdit).
+     *
+     * Two directions are checked because we cannot assume which block's
+     * physics actually gets re-evaluated first:
+     *  - the tracked crop's own physics fires (its support may have just
+     *    failed) -- checked by looking at the block directly below it;
+     *  - the block below a tracked crop has its own physics fire because IT
+     *    changed -- checked from that block's perspective, in case the crop
+     *    above has not (yet) had its own physics re-run in the same tick.
+     * discardAt() is idempotent (returns false harmlessly if already
+     * untracked), so the overlap between the two checks is not a problem.
+     */
     @EventHandler(ignoreCancelled = true)
+    public void onPhysics(BlockPhysicsEvent event) {
+        Block block = event.getBlock();
+
+        farms.at(block).ifPresent(rec -> {
+            if (block.getRelative(0, -1, 0).getType() != Material.FARMLAND) {
+                farms.discardAt(block);
+            }
+        });
+
+        if (block.getType() != Material.FARMLAND) {
+            Block above = block.getRelative(0, 1, 0);
+            if (farms.at(above).isPresent()) {
+                farms.discardAt(above);
+            }
+        }
+    }
+
+    /**
+     * MONITOR, not the default NORMAL: a protection plugin cancelling at
+     * HIGHEST runs *after* NORMAL, so a NORMAL-priority handler would already
+     * have mutated state (deleted the record, paid out, dropped items) before
+     * the protection plugin's cancellation ever happens -- rechecking
+     * isCancelled() at the top of a NORMAL handler cannot fix that, since the
+     * cancellation has not occurred yet at that point in the same event
+     * dispatch. Only running after every other priority tier, including
+     * HIGHEST, observes the final cancellation state before mutating.
+     * MONITOR's "read only" convention is a soft guideline, not a framework
+     * restriction; combined with ignoreCancelled = true it means this handler
+     * simply never runs at all once anything upstream has cancelled the
+     * event, which is exactly the property needed here.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
@@ -98,18 +161,26 @@ public final class FarmListener implements Listener {
     }
 
     /**
-     * Breaking a tracked crop must always untrack it, ripe or not — otherwise the
-     * block is gone while the record and its scheduled task live on, pointing at
-     * air. Ripe crops still pay out; unripe ones are simply discarded.
+     * Breaking a tracked crop must always untrack it, ripe or not -- otherwise
+     * the block is gone while the record and its scheduled task live on,
+     * pointing at air. Ripe crops still pay out; unripe ones are simply
+     * discarded.
+     *
+     * MONITOR, same reasoning as onInteract above: this must run after any
+     * protection plugin's HIGHEST-priority cancellation, or the record gets
+     * deleted here while the block itself survives because the break was
+     * blocked -- leaving a live crop block with no tracking, so vanilla growth
+     * resumes on it and the "vanilla growth never advances a tracked plant"
+     * guarantee is broken.
      */
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
         if (farms.at(block).isEmpty()) return;
 
         event.setDropItems(false);
         if (!farms.harvestAt(event.getPlayer(), block)) {
-            // Not ripe (or not the owner's) — drop the record so nothing is orphaned.
+            // Not ripe (or not the owner's) -- drop the record so nothing is orphaned.
             farms.discardAt(block);
             event.getPlayer().sendMessage(
                     "§8[§c!§8] §7That crop wasn't ready. Lost it.");

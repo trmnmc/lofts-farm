@@ -49,6 +49,19 @@ public final class FarmService {
                 block.getX(), block.getY(), block.getZ(),
                 stack.crop(), clock.plantedAt(), clock.readyAt());
 
+        // A stale record can already occupy this key: an orphan left by a
+        // destruction path this listener does not detect, or a record that
+        // survived a restart. Clear it from its previous owner's state and
+        // cancel its task first, or ownership would straddle two players
+        // against the same key -- the old owner keeps a record pointing at a
+        // block that is now someone else's crop, and could win the key back
+        // on the next load().
+        UUID previousOwner = owners.get(record.key());
+        if (previousOwner != null) {
+            state(previousOwner).remove(record.key());
+            scheduler.cancel(record.key());
+        }
+
         state(player.getUniqueId()).put(record);
         owners.put(record.key(), player.getUniqueId());
         scheduler.schedule(record);
@@ -133,26 +146,57 @@ public final class FarmService {
         if (!Files.exists(f)) return;
         try {
             String all = Files.readString(f);
-            UUID current = null;
+            String currentIdText = null;
+            boolean inBlock = false;
             StringBuilder chunk = new StringBuilder();
+            int failures = 0;
+            List<String> failedIds = new ArrayList<>();
+
             for (String line : all.split("\n")) {
                 if (line.startsWith("player ")) {
-                    current = UUID.fromString(line.substring(7).trim());
+                    currentIdText = line.substring(7).trim();
                     chunk.setLength(0);
-                } else if (line.trim().equals("end") && current != null) {
-                    FarmState st = StateCodec.read(chunk.toString());
-                    states.put(current, st);
-                    for (PlantRecord r : st.plants().values()) {
-                        owners.put(r.key(), current);
-                        scheduler.schedule(r);
-                        scheduler.paintStage(r);
+                    inBlock = true;
+                } else if (line.trim().equals("end") && inBlock) {
+                    // Each player's block is parsed in isolation. A malformed
+                    // UUID or a body StateCodec cannot make sense of must not
+                    // abort the whole load -- otherwise every player after the
+                    // bad line silently gets a fresh 250-cash state, and the
+                    // next shutdown's save() overwrites farms.txt with that
+                    // partial data. One bad line would otherwise destroy every
+                    // farm after it.
+                    try {
+                        UUID id = UUID.fromString(currentIdText);
+                        FarmState st = StateCodec.read(chunk.toString());
+                        states.put(id, st);
+                        for (PlantRecord r : st.plants().values()) {
+                            owners.put(r.key(), id);
+                            scheduler.schedule(r);
+                            scheduler.paintStage(r);
+                        }
+                        for (String skipped : StateCodec.lastSkipped()) {
+                            plugin.getLogger().warning("Skipped malformed line for player "
+                                    + currentIdText + ": " + skipped);
+                        }
+                    } catch (Exception e) {
+                        failures++;
+                        failedIds.add(String.valueOf(currentIdText));
+                        plugin.getLogger().warning("Could not load farm for player "
+                                + currentIdText + ": " + e.getMessage());
                     }
-                    current = null;
-                } else {
+                    inBlock = false;
+                    currentIdText = null;
+                } else if (inBlock) {
                     chunk.append(line).append('\n');
                 }
             }
-            plugin.getLogger().info("Loaded " + states.size() + " farm(s).");
+
+            String summary = "Loaded " + states.size() + " farm(s).";
+            if (failures > 0) {
+                summary += " " + failures + " farm(s) could not be loaded and were skipped: "
+                        + String.join(", ", failedIds);
+            }
+            plugin.getLogger().info(summary);
         } catch (Exception e) {
             plugin.getLogger().warning("Could not load farms: " + e.getMessage());
         }

@@ -42,6 +42,12 @@ public final class Items {
                 "\u00A78Right-click farmland to sow"
         ));
 
+        // This item carries per-item mutable state (remaining plantings) in its
+        // own meta. Two of these must never share a stack slot, or sowing one
+        // decrements both — so it is pinned to a stack size of 1 at the source,
+        // making every held.setItemMeta(...) write correct by construction.
+        meta.setMaxStackSize(1);
+
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
         pdc.set(cropKey(plugin), PersistentDataType.STRING, stack.crop().id());
         pdc.set(usesKey(plugin), PersistentDataType.INTEGER, stack.remaining());

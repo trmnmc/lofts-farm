@@ -36,7 +36,11 @@ public final class GrowthScheduler {
     public void schedule(PlantRecord record) {
         cancel(record.key());
         long delayMs = record.clock().remainingMs(System.currentTimeMillis());
-        long ticks = Math.max(1L, delayMs / 50L);
+        // Ceiling, not floor: a task scheduled mid-tick that floors can fire up
+        // to 49ms before readyAt, so ripe() reads false and it paints the
+        // second-to-last stage instead of the ripe one, self-removing and
+        // leaving the crop looking unripe until the next restart re-schedules it.
+        long ticks = Math.max(1L, (delayMs + 49L) / 50L);
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             tasks.remove(record.key());
             paintStage(record);
