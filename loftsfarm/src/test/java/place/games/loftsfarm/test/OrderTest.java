@@ -1,8 +1,10 @@
 package place.games.loftsfarm.test;
 
+import java.util.List;
 import place.games.loftsfarm.domain.Crop;
 import place.games.loftsfarm.domain.Fertiliser;
 import place.games.loftsfarm.domain.Order;
+import place.games.loftsfarm.domain.OrderLine;
 import place.games.loftsfarm.domain.Storage;
 
 public final class OrderTest {
@@ -38,5 +40,33 @@ public final class OrderTest {
         Check.eq("tally caps at required", o.heldFor(s, 0), 3);
         Check.isTrue("delivery succeeds", o.deliver(s));
         Check.eq("delivery consumed exactly the quantity", s.count(Crop.WHEAT), 4);
+
+        // Multi-line order: test atomicity of deliver() with wheat and carrot
+        Order multi = new Order("m1", List.of(
+                new OrderLine(Crop.WHEAT, 2, 10L),
+                new OrderLine(Crop.CARROT, 3, 15L)
+        ), 200_000L);
+
+        Check.eq("two lines", multi.lines().size(), 2);
+        Check.eq("pay is sum of both lines", multi.pay(), 65L);
+
+        Storage s2 = new Storage();
+        s2.add(Crop.WHEAT, 2);
+        // Line 1 (wheat) satisfied, line 2 (carrot) short
+        Check.isFalse("unsatisfied multi-line order", multi.satisfiedBy(s2));
+        Check.isFalse("deliver fails when any line short", multi.deliver(s2));
+        // Atomicity: neither line was consumed
+        Check.eq("wheat unchanged after failed delivery", s2.count(Crop.WHEAT), 2);
+        Check.eq("carrot unchanged after failed delivery", s2.count(Crop.CARROT), 0);
+        // Per-line tally in partial state
+        Check.eq("heldFor line 0 (wheat satisfied)", multi.heldFor(s2, 0), 2);
+        Check.eq("heldFor line 1 (carrot short)", multi.heldFor(s2, 1), 0);
+
+        // Top up carrot, now deliver should succeed
+        s2.add(Crop.CARROT, 3);
+        Check.isTrue("satisfied multi-line order", multi.satisfiedBy(s2));
+        Check.isTrue("deliver succeeds when all lines met", multi.deliver(s2));
+        Check.eq("wheat consumed exactly", s2.count(Crop.WHEAT), 0);
+        Check.eq("carrot consumed exactly", s2.count(Crop.CARROT), 0);
     }
 }
