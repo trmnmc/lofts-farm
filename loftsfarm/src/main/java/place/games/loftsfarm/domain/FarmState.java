@@ -1,7 +1,8 @@
 package place.games.loftsfarm.domain;
 
-import java.util.EnumMap;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Everything one player's farm knows. One instance per player. */
@@ -23,17 +24,18 @@ public final class FarmState {
 
     /**
      * Sells every crop in storage at its raw value, crediting the wallet.
-     * Returns a per-crop record of what sold, so callers can report it.
-     * Storage is emptied only for crops that actually sold.
+     * Returns a per-crop record of what sold, in Crop enum order, so callers
+     * can report it deterministically. Storage is emptied only for crops
+     * that actually sold.
      */
-    public Map<Crop, Long> sellAll() {
-        Map<Crop, Long> sold = new EnumMap<>(Crop.class);
+    public List<SaleLine> sellAll() {
+        List<SaleLine> sold = new ArrayList<>();
         for (Crop c : Crop.values()) {
             int n = storage.count(c);
             if (n > 0 && storage.take(c, n)) {
                 long gross = (long) n * c.rawValue();
                 wallet.credit(gross);
-                sold.put(c, gross);
+                sold.add(new SaleLine(c, n, gross));
             }
         }
         return sold;

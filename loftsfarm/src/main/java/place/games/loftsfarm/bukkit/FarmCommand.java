@@ -71,10 +71,10 @@ public final class FarmCommand implements CommandExecutor {
                     player.sendMessage(P + "Nothing in farm storage.");
                 } else {
                     long total = 0L;
-                    for (var entry : sold.entrySet()) {
-                        player.sendMessage(P + "Sold " + entry.getKey().displayName()
-                                + " for \u00A7f$" + entry.getValue());
-                        total += entry.getValue();
+                    for (var line : sold) {
+                        player.sendMessage(P + "Sold " + line.quantity() + " \u00D7 " + line.crop().displayName()
+                                + " for \u00A7f$" + line.gross());
+                        total += line.gross();
                     }
                     player.sendMessage(P + "Total \u00A7f$" + total
                             + "\u00A77. Balance \u00A7f$" + st.wallet().balance());
