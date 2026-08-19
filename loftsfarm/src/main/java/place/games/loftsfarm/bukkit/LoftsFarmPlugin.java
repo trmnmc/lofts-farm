@@ -14,8 +14,10 @@ public final class LoftsFarmPlugin extends JavaPlugin {
         farms.load();
         OrderService orders = new OrderService(farms);
         BoardGui board = new BoardGui(farms, orders);
-        getServer().getPluginManager().registerEvents(new FarmListener(this, farms), this);
+        HoeGui hoeGui = new HoeGui(this, farms, board);
+        getServer().getPluginManager().registerEvents(new FarmListener(this, farms, hoeGui), this);
         getServer().getPluginManager().registerEvents(board, this);
+        getServer().getPluginManager().registerEvents(hoeGui, this);
         var cmd = getCommand("farm");
         if (cmd != null) cmd.setExecutor(new FarmCommand(this, farms, board));
         getLogger().info("LoftsFarm v2 slice enabled. v1 economy untouched.");

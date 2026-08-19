@@ -3,6 +3,7 @@ package place.games.loftsfarm.test;
 import place.games.loftsfarm.domain.Crop;
 import place.games.loftsfarm.domain.FarmState;
 import place.games.loftsfarm.domain.PlantRecord;
+import place.games.loftsfarm.domain.PlotPricing;
 import place.games.loftsfarm.domain.StateCodec;
 
 public final class StateCodecTest {
@@ -80,5 +81,21 @@ public final class StateCodecTest {
         Check.eq("mixed good/bad: skipped count", StateCodec.lastSkipped().size(), 1);
         Check.isTrue("mixed good/bad: contains first good plant", mixedSt.plants().containsKey("good:10:64:5"));
         Check.isTrue("mixed good/bad: contains second good plant", mixedSt.plants().containsKey("another:20:65:5"));
+
+        // ---- plotsOwned round-trip ----
+
+        FarmState withPlots = new FarmState(100L);
+        withPlots.incrementPlots(); // START_PLOTS -> START_PLOTS + 1
+        withPlots.incrementPlots(); // -> START_PLOTS + 2
+        String plotsText = StateCodec.write(withPlots);
+        Check.isTrue("plots line present in output",
+                plotsText.contains("plots " + (PlotPricing.START_PLOTS + 2)));
+        FarmState plotsBack = StateCodec.read(plotsText);
+        Check.eq("plots owned round-trips", plotsBack.plotsOwned(), PlotPricing.START_PLOTS + 2);
+
+        // A save file written before this feature existed has no plots line.
+        FarmState noPlotsLine = StateCodec.read("cash 100\n");
+        Check.eq("missing plots line defaults to START_PLOTS",
+                noPlotsLine.plotsOwned(), PlotPricing.START_PLOTS);
     }
 }

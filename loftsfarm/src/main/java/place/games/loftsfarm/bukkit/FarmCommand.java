@@ -100,6 +100,17 @@ public final class FarmCommand implements CommandExecutor {
                 player.sendMessage(P + "Laid " + made + " farmland blocks. Sow with a seed in hand.");
             }
             case "board" -> board.open(player);
+            case "hoe" -> {
+                var leftover = player.getInventory().addItem(Items.smartHoe(plugin));
+                if (leftover.isEmpty()) {
+                    player.sendMessage(P + "Smart Hoe in hand. Right-click to open the menu.");
+                } else {
+                    for (var stack : leftover.values()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), stack);
+                    }
+                    player.sendMessage(P + "Your inventory was full, so it's on the ground.");
+                }
+            }
             default -> {
                 player.sendMessage(P + "\u00A7eLoftsFarm slice");
                 player.sendMessage(P + "/farm setup \u00A78- lay a test plot (op)");
@@ -107,6 +118,7 @@ public final class FarmCommand implements CommandExecutor {
                 player.sendMessage(P + "/farm balance");
                 player.sendMessage(P + "/farm sell \u00A78- sell everything in farm storage");
                 player.sendMessage(P + "/farm board \u00A78- the order board");
+                player.sendMessage(P + "/farm hoe \u00A78- get the Smart Hoe");
                 player.sendMessage(P + "\u00A78Right-click farmland to sow, a ripe crop to harvest.");
             }
         }

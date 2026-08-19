@@ -37,12 +37,18 @@ public final class FarmListener implements Listener {
     private static final Set<Material> CROP_MATERIALS =
             EnumSet.of(Material.WHEAT, Material.CARROTS);
 
+    /** Block types a Smart Hoe right-click will offer to buy a plot on. */
+    private static final Set<Material> TILLABLE =
+            EnumSet.of(Material.DIRT, Material.GRASS_BLOCK, Material.COARSE_DIRT);
+
     private final Plugin plugin;
     private final FarmService farms;
+    private final HoeGui hoeGui;
 
-    public FarmListener(Plugin plugin, FarmService farms) {
+    public FarmListener(Plugin plugin, FarmService farms, HoeGui hoeGui) {
         this.plugin = plugin;
         this.farms = farms;
+        this.hoeGui = hoeGui;
     }
 
     /**
@@ -185,12 +191,32 @@ public final class FarmListener implements Listener {
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
+        ItemStack held = player.getInventory().getItemInMainHand();
+        Action action = event.getAction();
+
+        // The Smart Hoe hijacks every right-click while it's held, in place of
+        // vanilla hoe-till and instead of any other block's own interaction
+        // (chests, doors, ...) -- it is meant to be the whole interface, so it
+        // must be checked before anything else here, on air as well as on a
+        // block. Cancelling is required: an uncancelled right-click with a
+        // vanilla hoe tills dirt into farmland for free, which would hand out
+        // unlimited plots for nothing.
+        if ((action == Action.RIGHT_CLICK_BLOCK || action == Action.RIGHT_CLICK_AIR)
+                && Items.isSmartHoe(plugin, held)) {
+            event.setCancelled(true);
+            Block clicked = event.getClickedBlock();
+            if (clicked != null && TILLABLE.contains(clicked.getType())) {
+                hoeGui.openPlotConfirm(player, clicked);
+            } else {
+                hoeGui.openHub(player);
+            }
+            return;
+        }
+
         Block block = event.getClickedBlock();
         if (block == null) return;
 
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            ItemStack held = player.getInventory().getItemInMainHand();
-
             // Fertilise a growing crop.
             if (Items.isFertiliser(plugin, held) && farms.at(block).isPresent()) {
                 event.setCancelled(true);

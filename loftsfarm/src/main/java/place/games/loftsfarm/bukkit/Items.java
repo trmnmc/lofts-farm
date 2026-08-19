@@ -22,6 +22,7 @@ public final class Items {
     private static NamespacedKey cropKey(Plugin p) { return new NamespacedKey(p, "crop"); }
     private static NamespacedKey usesKey(Plugin p) { return new NamespacedKey(p, "uses"); }
     private static NamespacedKey fertKey(Plugin p) { return new NamespacedKey(p, "fertiliser"); }
+    private static NamespacedKey hoeKey(Plugin p) { return new NamespacedKey(p, "smart_hoe"); }
 
     /** Vanilla material used to represent each crop's seed. */
     private static Material seedMaterial(Crop crop) {
@@ -98,5 +99,34 @@ public final class Items {
         if (item == null || !item.hasItemMeta()) return false;
         return item.getItemMeta().getPersistentDataContainer()
                 .has(fertKey(plugin), PersistentDataType.BYTE);
+    }
+
+    /**
+     * The whole player-facing interface in one hotbar item: right-click opens
+     * the menu, right-click on dirt/grass/coarse dirt buys a plot. Unbreakable
+     * and capped at a stack of one, same reasoning as the seed item above --
+     * there is no per-item state here, but there is also no reason a player
+     * should ever be holding more than one.
+     */
+    public static ItemStack smartHoe(Plugin plugin) {
+        ItemStack item = new ItemStack(Material.IRON_HOE);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName("§bSmart Hoe");
+        meta.setLore(List.of(
+                "§7Right-click: open the farm menu",
+                "§7Right-click dirt, grass or coarse dirt: buy a plot",
+                "§8Orders, seeds and storage all live in here"
+        ));
+        meta.setUnbreakable(true);
+        meta.setMaxStackSize(1);
+        meta.getPersistentDataContainer().set(hoeKey(plugin), PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    public static boolean isSmartHoe(Plugin plugin, ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(hoeKey(plugin), PersistentDataType.BYTE);
     }
 }

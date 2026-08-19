@@ -8,6 +8,7 @@ import java.util.List;
  * no downloads are permitted, so the format is deliberately trivial:
  *
  *   cash <balance>
+ *   plots <plotsOwned>
  *   stock <cropId> <count>
  *   plant <world> <x> <y> <z> <cropId> <plantedAt> <readyAt>
  *
@@ -31,6 +32,7 @@ public final class StateCodec {
     public static String write(FarmState state) {
         StringBuilder sb = new StringBuilder();
         sb.append("cash ").append(state.wallet().balance()).append('\n');
+        sb.append("plots ").append(state.plotsOwned()).append('\n');
         state.storage().snapshot().forEach((crop, n) -> {
             if (n > 0) sb.append("stock ").append(crop.id()).append(' ').append(n).append('\n');
         });
@@ -61,6 +63,7 @@ public final class StateCodec {
             String[] p = line.split(" ");
             try {
                 switch (p[0]) {
+                    case "plots" -> state.setPlotsOwned(Integer.parseInt(p[1]));
                     case "stock" -> {
                         Crop c = Crop.byId(p[1]);
                         if (c != null) state.storage().add(c, Integer.parseInt(p[2]));

@@ -2,6 +2,7 @@ package place.games.loftsfarm.test;
 
 import place.games.loftsfarm.domain.Crop;
 import place.games.loftsfarm.domain.FarmState;
+import place.games.loftsfarm.domain.PlotPricing;
 import place.games.loftsfarm.domain.SaleLine;
 
 import java.util.List;
@@ -53,5 +54,32 @@ public final class FarmStateTest {
         List<SaleLine> soldAgain = twoCrops.sellAll();
         Check.isTrue("selling again with now-empty storage returns an empty list", soldAgain.isEmpty());
         Check.eq("selling again does not touch the balance", twoCrops.wallet().balance(), expectedTotal);
+
+        // ---- plotsOwned ----
+
+        FarmState plots = new FarmState(0L);
+        Check.eq("starts at START_PLOTS", plots.plotsOwned(), PlotPricing.START_PLOTS);
+        for (int i = PlotPricing.START_PLOTS; i < PlotPricing.MAX_PLOTS; i++) {
+            Check.isTrue("increment succeeds below max (at " + i + ")", plots.incrementPlots());
+        }
+        Check.eq("reaches max plots", plots.plotsOwned(), PlotPricing.MAX_PLOTS);
+        Check.isFalse("increment refuses past max", plots.incrementPlots());
+        Check.eq("stays at max after refused increment", plots.plotsOwned(), PlotPricing.MAX_PLOTS);
+
+        // ---- per-crop sell ----
+
+        FarmState sellState = new FarmState(0L);
+        Check.isTrue("selling absent crop returns empty", sellState.sell(Crop.WHEAT).isEmpty());
+
+        sellState.storage().add(Crop.WHEAT, 3);
+        sellState.storage().add(Crop.CARROT, 2);
+        var wheatSale = sellState.sell(Crop.WHEAT);
+        Check.isTrue("selling held crop returns a sale", wheatSale.isPresent());
+        Check.eq("sale reports correct crop", wheatSale.get().crop(), Crop.WHEAT);
+        Check.eq("sale reports correct quantity", wheatSale.get().quantity(), 3);
+        Check.eq("sale reports correct gross", wheatSale.get().gross(), 3L * Crop.WHEAT.rawValue());
+        Check.eq("wallet credited by the sale", sellState.wallet().balance(), 3L * Crop.WHEAT.rawValue());
+        Check.eq("sold crop's storage is emptied", sellState.storage().count(Crop.WHEAT), 0);
+        Check.eq("other crop's storage is untouched", sellState.storage().count(Crop.CARROT), 2);
     }
 }

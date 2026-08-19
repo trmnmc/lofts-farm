@@ -7,4 +7,4 @@ authors: [games.place]
 commands:
   farm:
     description: LoftsFarm slice commands
-    usage: /farm <help|give|balance|sell|board|setup>
+    usage: /farm <help|give|balance|sell|board|setup|hoe>

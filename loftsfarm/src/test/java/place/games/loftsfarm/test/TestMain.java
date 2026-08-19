@@ -10,6 +10,7 @@ public final class TestMain {
         OrderFactoryTest.run();
         StateCodecTest.run();
         FarmStateTest.run();
+        PlotPricingTest.run();
         System.exit(Check.report());
     }
 }
