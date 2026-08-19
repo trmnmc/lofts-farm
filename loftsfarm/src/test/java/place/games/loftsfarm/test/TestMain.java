@@ -7,6 +7,7 @@ public final class TestMain {
         WalletTest.run();
         SeedStackTest.run();
         OrderTest.run();
+        StateCodecTest.run();
         System.exit(Check.report());
     }
 }
