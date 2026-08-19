@@ -1,0 +1,1323 @@
+<title>Lofts Playtest</title>
+<style>
+  :root{
+    --ground:#EEF1EF; --panel:#F8FAF9; --panel-2:#E3E8E5; --line:#CBD3CE;
+    --ink:#12171A; --ink-2:#495450; --ink-3:#78847E;
+    --grain:#9A6F12; --grain-bright:#C99A2E; --grain-wash:#EFE3C6;
+    --gain:#1B7A54; --loss:#B33A22; --gain-wash:#D8EAE1; --loss-wash:#F3DCD5;
+    --focus:#1F6FB2; --on-grain:#FFFFFF;
+    --f-display:Georgia,'Iowan Old Style','Source Serif Pro',serif;
+    --f-ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --f-data:ui-monospace,'Cascadia Mono',Consolas,'SF Mono',Menlo,monospace;
+    --r:3px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0E1116; --panel:#161B21; --panel-2:#1E242B; --line:#2C343D;
+      --ink:#E7EBE9; --ink-2:#A3AEB4; --ink-3:#6F7C84;
+      --grain:#D8A93C; --grain-bright:#EFC15E; --grain-wash:#3A2F14;
+      --gain:#43BC8B; --loss:#E4664A; --gain-wash:#123024; --loss-wash:#361A14;
+      --focus:#5AA9E6; --on-grain:#12171A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1116; --panel:#161B21; --panel-2:#1E242B; --line:#2C343D;
+    --ink:#E7EBE9; --ink-2:#A3AEB4; --ink-3:#6F7C84;
+    --grain:#D8A93C; --grain-bright:#EFC15E; --grain-wash:#3A2F14;
+    --gain:#43BC8B; --loss:#E4664A; --gain-wash:#123024; --loss-wash:#361A14;
+    --focus:#5AA9E6; --on-grain:#12171A;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--f-ui);
+       font-size:15px;line-height:1.55;margin:0;padding:0}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 72px}
+  h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0}
+  h1{font-size:clamp(28px,4.4vw,42px);line-height:1.12;letter-spacing:-.012em}
+  h2{font-size:clamp(20px,2.6vw,26px);line-height:1.2}
+  h3{font-size:17px}
+  p{margin:0}
+  .eyebrow{font-family:var(--f-data);font-size:11px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--grain);font-weight:600}
+  .muted{color:var(--ink-2)}
+  .tiny{font-size:13px;color:var(--ink-2)}
+  .num{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  .stack{display:flex;flex-direction:column}
+  .g8{gap:8px}.g12{gap:12px}.g16{gap:16px}.g24{gap:24px}.g32{gap:32px}
+  .row{display:flex;flex-wrap:wrap;align-items:center}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+  .screen{display:none}
+  .screen.on{display:flex;flex-direction:column;gap:24px}
+
+  button{font-family:var(--f-ui);font-size:14px;cursor:pointer;border-radius:var(--r);
+         border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+         padding:9px 16px;transition:background .12s,border-color .12s}
+  button:hover:not(:disabled){border-color:var(--grain)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .primary{background:var(--grain);border-color:var(--grain);color:var(--on-grain);font-weight:600}
+  .primary:hover:not(:disabled){background:var(--grain-bright);border-color:var(--grain-bright)}
+
+  .bar{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;
+       background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 18px}
+  .stat{display:flex;flex-direction:column;gap:1px}
+  .stat .k{font-family:var(--f-data);font-size:10px;letter-spacing:.1em;
+           text-transform:uppercase;color:var(--ink-3)}
+  .stat .v{font-family:var(--f-data);font-size:19px;font-variant-numeric:tabular-nums;font-weight:600}
+  .stat .v.hot{color:var(--loss)}
+
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  @media(max-width:860px){.grid3{grid-template-columns:1fr}}
+
+  .plot{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .slot{aspect-ratio:1;border:1px solid var(--line);border-radius:var(--r);
+        background:var(--panel-2);display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:4px;padding:6px;text-align:center;font-size:12px;color:var(--ink)}
+  .slot.empty{border-style:dashed;color:var(--ink-3)}
+  .slot.empty:hover:not(:disabled){border-color:var(--grain);color:var(--grain)}
+  .slot.ready{border-color:var(--gain);background:var(--gain-wash);cursor:pointer}
+  .slot .icon{font-size:22px;line-height:1}
+  .slot .nm{font-weight:600;font-size:12px;line-height:1.2}
+  .bar-mini{width:74%;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+  .bar-mini i{display:block;height:100%;background:var(--grain);width:0}
+  button.fert{font-size:10.5px;padding:2px 7px;margin-top:2px;font-family:var(--f-data);
+              border-color:var(--grain);color:var(--grain);background:transparent}
+  button.fert:hover:not(:disabled){background:var(--grain-wash)}
+  .starve{border-color:var(--loss)!important}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  .scrollx{overflow-x:auto}
+  th{font-family:var(--f-data);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+     color:var(--ink-3);text-align:right;padding:5px 7px;border-bottom:1px solid var(--line);font-weight:600}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:6px 7px;border-bottom:1px solid var(--line);text-align:right;
+     font-family:var(--f-data);font-variant-numeric:tabular-nums;color:var(--ink)}
+  tbody tr:last-child td{border-bottom:none}
+  .tk{color:var(--ink-3);font-size:11px}
+  .up{color:var(--gain)}.dn{color:var(--loss)}
+  .chip{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;
+        font-family:var(--f-data);font-weight:600}
+  .chip.up{background:var(--gain-wash)}.chip.dn{background:var(--loss-wash)}
+  .chip.neutral{background:var(--panel-2);color:var(--ink-2)}
+
+  .log{font-family:var(--f-data);font-size:12px;background:var(--panel-2);
+       border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;
+       height:132px;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:3px}
+  .log div{color:var(--ink-2)}
+  .log .hl{color:var(--grain)}
+
+  .banner{border-left:3px solid var(--grain);background:var(--grain-wash);color:var(--ink);
+          padding:11px 15px;border-radius:0 var(--r) var(--r) 0;font-size:14px}
+  .banner.dead{border-left-color:var(--loss);background:var(--loss-wash)}
+
+  fieldset{border:1px solid var(--line);border-radius:var(--r);padding:15px 17px;margin:0;
+           background:var(--panel)}
+  legend{font-weight:600;padding:0 7px;font-size:14px}
+  .opts{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+  label.opt{display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:14px;
+            padding:5px 8px;border-radius:var(--r)}
+  label.opt:hover{background:var(--panel-2)}
+  input[type=radio]{margin-top:3px;accent-color:var(--grain);flex:none}
+  textarea{width:100%;font-family:var(--f-ui);font-size:14px;padding:9px 11px;
+           border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);
+           color:var(--ink);resize:vertical;min-height:74px;margin-top:9px}
+
+  pre.brief{white-space:pre-wrap;font-family:var(--f-data);font-size:12.5px;line-height:1.6;
+            background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);
+            color:var(--ink);padding:16px;overflow-x:auto;max-height:440px;overflow-y:auto}
+
+  ul.tight{margin:0;padding-left:19px}
+  ul.tight li{margin-bottom:5px}
+  hr{border:none;border-top:1px solid var(--line);margin:0}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap stack g32">
+
+  <section id="s-intro" class="screen on">
+    <div class="stack g12">
+      <span class="eyebrow">Design experiment &middot; Lofts farming &amp; economy</span>
+      <h1>Three ways to run your farm</h1>
+      <p class="muted" style="max-width:64ch">You said the farming side is boring, and then you said
+      why: it's watching paint dry. Those are two different diagnoses, so this tests both &mdash; before
+      a developer spends a month on the wrong one.</p>
+    </div>
+
+    <div class="grid3">
+      <div class="card stack g12">
+        <span class="eyebrow">Round 1 &middot; today</span>
+        <h3>The build you have</h3>
+        <p class="tiny">Six crops with the exact seed costs, sale values and grow times from your
+        <span class="num">config.yml</span>. Fixed prices. Harvests auto-collect and the Auto Merchant
+        sells them. Turn-based, eight days.</p>
+      </div>
+      <div class="card stack g12">
+        <span class="eyebrow">Round 2 &middot; decisions</span>
+        <h3>Prices that move</h3>
+        <p class="tiny">Same crops, same costs. Prices shift overnight, harvests go to storage, you
+        choose when to sell, and contracts become a hedge. Still turn-based, eight days.</p>
+      </div>
+      <div class="card stack g12">
+        <span class="eyebrow">Round 3 &middot; your design</span>
+        <h3>Slow crops, fast machines</h3>
+        <p class="tiny">Real time, three minutes. Crops stay slow &mdash; a pitcher runs half the round.
+        The mill runs as fast as you can feed it, and it can always eat more than you can grow. Fertiliser
+        halves a crop's remaining time, for a price. That gap is the whole design.</p>
+      </div>
+    </div>
+
+    <div class="banner">Round 3 measures two things. <strong>Dead air</strong> &mdash; seconds you had
+    nothing to do &mdash; tests whether fast machines cover for slow crops. <strong>Mill starvation</strong>
+    &mdash; seconds the machine sat with nothing to run &mdash; measures the supply gap, and whether it
+    pushed you to reach for fertiliser or just annoyed you. It records the exact second you first did.</div>
+
+    <div class="row g12">
+      <button class="primary" id="btn-start">Start Round 1</button>
+      <span class="tiny">About eight minutes for all three.</span>
+    </div>
+  </section>
+
+  <section id="s-game" class="screen">
+    <div class="stack g8">
+      <span class="eyebrow" id="g-eyebrow">Round 1</span>
+      <h2 id="g-title">The build you have today</h2>
+      <p class="tiny" id="g-sub"></p>
+    </div>
+
+    <div class="bar">
+      <div class="stat"><span class="k" id="g-clock-k">Day</span><span class="v num" id="g-day">1 / 8</span></div>
+      <div class="stat"><span class="k">Cash</span><span class="v num" id="g-cash">$2,000</span></div>
+      <div class="stat"><span class="k">Held stock</span><span class="v num" id="g-held">&mdash;</span></div>
+      <div class="stat"><span class="k">Net worth</span><span class="v num" id="g-net">$2,000</span></div>
+      <div class="stat" id="g-dead-box" style="display:none">
+        <span class="k">Dead air</span><span class="v num" id="g-dead">0s</span></div>
+      <button class="primary" id="btn-day">Advance to day 2</button>
+    </div>
+
+    <div class="grid2">
+      <div class="card stack g12">
+        <div class="row" style="justify-content:space-between;gap:8px">
+          <h3>Your garden</h3><span class="tiny" id="g-plothint">Click a plot to sow</span>
+        </div>
+        <div id="g-rack" class="stack g8" style="display:none"></div>
+        <div class="plot" id="g-plot"></div>
+        <div id="g-sowbox" class="stack g8"></div>
+      </div>
+
+      <div class="stack g16" style="min-width:0">
+        <div class="card stack g12" style="min-width:0">
+          <div class="row" style="justify-content:space-between;gap:8px">
+            <h3 id="g-mkt-title">Market</h3><span class="tiny" id="g-mkt-note"></span>
+          </div>
+          <div class="scrollx"><table id="g-market"></table></div>
+        </div>
+        <div class="card stack g12" id="g-contract-card" style="display:none">
+          <h3>Contracts</h3>
+          <div class="stack g8" id="g-contracts"></div>
+        </div>
+        <div class="card stack g12" id="g-mill-card" style="display:none">
+          <div class="row" style="justify-content:space-between;gap:8px">
+            <h3>The mill</h3><span class="tiny">2 raw &rarr; 1 batch &middot; sells for 20% more</span>
+          </div>
+          <div class="stack g8" id="g-mill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack g8">
+      <span class="eyebrow">Ledger</span>
+      <div class="log" id="g-log"></div>
+    </div>
+  </section>
+
+  <section id="s-mid" class="screen">
+    <div class="stack g12">
+      <span class="eyebrow" id="mid-eyebrow">Round 1 complete</span>
+      <h1 id="mid-h">Eight days of the current build</h1>
+    </div>
+    <div class="card stack g16"><div id="mid-body" class="stack g12"></div></div>
+    <div class="row g12">
+      <button class="primary" id="btn-next">Start Round 2</button>
+      <span class="tiny" id="mid-note"></span>
+    </div>
+  </section>
+
+  <section id="s-debrief" class="screen">
+    <div class="stack g12">
+      <span class="eyebrow">All three rounds complete</span>
+      <h1>What you actually did</h1>
+      <p class="muted" style="max-width:64ch">Behaviour first, opinions second &mdash; what you did is
+      harder to argue with than what either of us thinks.</p>
+    </div>
+
+    <div id="d-verdict"></div>
+
+    <div class="card stack g16">
+      <h3>Side by side</h3>
+      <div class="scrollx"><table id="d-compare"></table></div>
+      <div id="d-reads" class="stack g8"></div>
+    </div>
+
+    <div class="card stack g12">
+      <span class="eyebrow">Found while building this</span>
+      <h3>Some of your crops are never the right answer</h3>
+      <p class="tiny">Profit per plot per day, using your live config values. A crop earns its rung on the
+      ladder only if it beats everything cheaper and faster below it.</p>
+      <div class="scrollx"><table id="d-balance"></table></div>
+    </div>
+
+    <div class="stack g12">
+      <h2>Eleven questions</h2>
+      <p class="tiny">These are the ones I can't answer by reading your config. Answers feed straight
+      into the brief.</p>
+      <div class="stack g12" id="d-questions"></div>
+      <div class="row g12">
+        <button class="primary" id="btn-brief">Generate the brief</button>
+        <span class="tiny">Skip anything you don't have a view on.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-brief" class="screen">
+    <div class="stack g12">
+      <span class="eyebrow">Output</span>
+      <h1>Design brief</h1>
+      <p class="muted" style="max-width:64ch">Playtest evidence plus your answers, in one block.
+      Select it and copy, or use the button.</p>
+    </div>
+    <div class="row g12">
+      <button class="primary" id="btn-copy">Copy to clipboard</button>
+      <button id="btn-again">Run the playtest again</button>
+      <span class="tiny" id="copy-note"></span>
+    </div>
+    <pre class="brief" id="brief-out"></pre>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // cost / val / days taken verbatim from plugins/Lofts/config.yml.
+  // secs = the same crops compressed to a real-time scale for Round 3.
+  var CROPS = [
+    {id:"wheat",   nm:"Wheat",       ic:"\u{1F33E}", tk:"ADM",  cost:3,    val:20,   days:1, secs:20, vol:0.05},
+    {id:"carrot",  nm:"Carrot",      ic:"\u{1F955}", tk:"KR",   cost:5,    val:30,   days:1, secs:26, vol:0.06},
+    {id:"pumpkin", nm:"Pumpkin",     ic:"\u{1F383}", tk:"SFM",  cost:45,   val:190,  days:2, secs:45, vol:0.10},
+    {id:"cane",    nm:"Sugar Cane",  ic:"\u{1F36C}", tk:"KO",   cost:130,  val:240,  days:3, secs:60, vol:0.12},
+    {id:"wart",    nm:"Nether Wart", ic:"\u{1F344}", tk:"MRNA", cost:320,  val:520,  days:4, secs:78, vol:0.17},
+    {id:"pitcher", nm:"Pitcher",     ic:"\u{1FAB4}", tk:"SMG",  cost:1120, val:1600, days:5, secs:95, vol:0.24}
+  ];
+  var SLOTS = 6, DAYS = 8, START = 2000, RT_SECONDS = 180;
+  var byId = {}; CROPS.forEach(function(c){ byId[c.id] = c; });
+  var CHEAPEST = Math.min.apply(null, CROPS.map(function(c){ return c.cost; }));
+
+  var S = null, M = {1:null, 2:null, 3:null}, timer = null;
+
+  function $(id){ return document.getElementById(id); }
+  function money(n){
+    var neg = n < 0, v = Math.round(Math.abs(n));
+    return (neg ? "-$" : "$") + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  function show(id){
+    ["s-intro","s-game","s-mid","s-debrief","s-brief"].forEach(function(x){
+      $(x).classList.toggle("on", x === id);
+    });
+    window.scrollTo(0,0);
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function med(a){
+    if(!a.length) return 0;
+    var b = a.slice().sort(function(x,y){return x-y;});
+    return b[Math.floor(b.length/2)];
+  }
+  function now(){ return Date.now(); }
+
+  function newMetrics(){
+    return { think:[], planted:{}, actions:0, sells:0, holdDays:[], milled:0,
+             cAcc:0, cOff:0, topShare:0, plantCount:0, dead:0, samples:0,
+             fert:0, fertSpend:0, firstFertAt:null, starved:0, plantClicks:0 };
+  }
+
+  function initRound(r){
+    if(timer){ clearInterval(timer); timer = null; }
+    S = { round:r, rt:(r === 3), day:1, cash:START, slots:new Array(SLOTS).fill(null), inv:{}, batch:{},
+          price:{}, hist:{}, contracts:[], log:[], dayStart:now(), t0:now(),
+          sowFor:null, held:null, m:newMetrics(), over:false, lastPriceTick:0, nextContractAt:8,
+          contractSeq:0 };
+    if(r === 3) S.held = "wheat";
+    CROPS.forEach(function(c){ S.price[c.id] = c.val; S.hist[c.id] = [c.val]; });
+    if(r === 2) offerContract(1);
+    log(r === 1 ? "Day 1. Auto Merchant online — harvests will be sold automatically."
+      : r === 2 ? "Day 1. Auto Merchant offline. You sell, and you pick the moment."
+                : "Clock running. Three minutes. Nothing sells itself.", true);
+    render();
+    if(S.rt){
+      timer = setInterval(rtTick, 250);
+    }
+  }
+
+  function log(t, hl){ S.log.unshift({t:t, hl:!!hl}); }
+
+  var BATCH_MULT = 2.4; // 2 raw units in, sells for 1.2x their combined value
+
+  function netWorth(){
+    var n = S.cash, k;
+    for(k in S.inv){ n += S.inv[k].length * S.price[k]; }
+    for(k in S.batch){ n += S.batch[k] * S.price[k] * BATCH_MULT; }
+    return n;
+  }
+  function heldCount(){
+    var n = 0, k;
+    for(k in S.inv){ n += S.inv[k].length; }
+    for(k in S.batch){ n += S.batch[k]*2; }
+    return n;
+  }
+  function elapsed(){ return (now() - S.t0)/1000; }
+
+  function offerContract(day){
+    var pool = CROPS.filter(function(c){ return S.rt ? c.secs <= 45 : c.days <= 3; });
+    var c = pool[Math.floor(Math.random()*pool.length)];
+    var qty = c.cost < 50 ? 3 : 2;
+    S.contractSeq++;
+    // fuse must clear at least one full grow cycle, or accepting is a trap
+    S.contracts.push({
+      id:"c"+S.contractSeq, crop:c.id, qty:qty,
+      unit:Math.round(c.val*1.12),
+      due: S.rt ? Math.round(elapsed()) + c.secs + 30 : Math.min(DAYS, day + c.days + 2),
+      state:"offered"
+    });
+    S.m.cOff++;
+  }
+
+  // ---------- real-time engine ----------
+  function rtTick(){
+    if(!S || !S.rt || S.over) return;
+    var e = elapsed();
+
+    // harvest readiness is player-driven; only prices, contracts and the clock run themselves.
+    if(e - S.lastPriceTick >= 2){
+      S.lastPriceTick = e;
+      CROPS.forEach(function(c){
+        var drift = (Math.random()*2 - 1) * c.vol;
+        var np = Math.max(c.val*0.55, Math.min(c.val*1.9, S.price[c.id] * (1 + drift)));
+        S.price[c.id] = Math.round(np);
+        S.hist[c.id].push(S.price[c.id]);
+        if(S.hist[c.id].length > 24) S.hist[c.id].shift();
+      });
+      if(Math.random() < 0.30){
+        var c2 = CROPS[Math.floor(Math.random()*CROPS.length)];
+        var up = Math.random() < 0.5, mag = 0.20 + Math.random()*0.18;
+        S.price[c2.id] = Math.round(Math.max(c2.val*0.55,
+          Math.min(c2.val*1.9, S.price[c2.id] * (1 + (up?mag:-mag)))));
+        log((up ? "Bulk order — " : "Glut — ") + c2.nm + " " + (up?"+":"−") +
+            Math.round(mag*100) + "%.", true);
+      }
+      render();
+    }
+
+    if(e >= S.nextContractAt){
+      S.nextContractAt = e + 16 + Math.random()*8;
+      offerContract(0);
+      log("New contract on the board.", true);
+      render();
+    }
+
+    S.contracts.forEach(function(ct){
+      if(ct.state === "offered" && e > ct.due){ ct.state = "done"; S.m.cOff--; }
+      if(ct.state !== "accepted" || e < ct.due) return;
+      var st = S.inv[ct.crop] || [], cr = byId[ct.crop];
+      if(st.length >= ct.qty){
+        st.splice(0, ct.qty);
+        S.cash += ct.qty * ct.unit;
+        log("Contract delivered: " + ct.qty + " × " + cr.nm + " for " + money(ct.qty*ct.unit) + ".", true);
+      } else {
+        var fee = Math.min(S.cash, Math.round(ct.qty * ct.unit * 0.08));
+        S.cash -= fee;
+        log("Contract failed — short on " + cr.nm + ". Penalty " + money(fee) + ".", true);
+      }
+      ct.state = "done";
+      render();
+    });
+
+    // dead-air + machine-starvation sampling, once per whole second
+    var whole = Math.floor(e);
+    if(whole > S.m.samples){
+      S.m.samples = whole;
+      antiStall();
+      if(!hasAction()) S.m.dead++;
+      if(!canMill()) S.m.starved++;
+    }
+
+    paintClock();
+    if(e >= RT_SECONDS) finish();
+  }
+
+  // A round must never reach a state the player cannot recover from.
+  function antiStall(){
+    if(S.cash >= CHEAPEST) return;
+    if(S.slots.some(function(s){ return s; })) return;
+    var k;
+    for(k in S.inv){ if(S.inv[k].length) return; }
+    for(k in S.batch){ if(S.batch[k]) return; }
+    S.cash = Math.max(S.cash, 0) + 60;
+    log("Broke with nothing growing — the co-op fronts you " + money(60) + " in seed money.", true);
+  }
+
+  function canMill(){
+    for(var k in S.inv){ if(S.inv[k].length >= 2) return true; }
+    return false;
+  }
+  function fertCost(c){ return Math.max(20, Math.round(c.cost*0.6)); }
+
+  function hasAction(){
+    var i;
+    for(i = 0; i < S.slots.length; i++){
+      var s = S.slots[i];
+      if(!s && S.cash >= CHEAPEST) return true;
+      if(s && now() >= s.readyAt) return true;
+    }
+    for(var k in S.inv){ if(S.inv[k].length) return true; }
+    for(var j in S.batch){ if(S.batch[j]) return true; }
+    for(i = 0; i < S.contracts.length; i++){
+      if(S.contracts[i].state === "offered") return true;
+    }
+    return false;
+  }
+
+  function paintClock(){
+    var left = Math.max(0, RT_SECONDS - elapsed());
+    var el = $("g-day");
+    el.textContent = Math.floor(left/60) + ":" + ("0" + Math.floor(left%60)).slice(-2);
+    el.classList.toggle("hot", left <= 30);
+    $("g-dead").textContent = S.m.dead + "s";
+    $("g-cash").textContent = money(S.cash);
+    $("g-net").textContent = money(netWorth());
+    $("g-held").textContent = heldCount() + " units";
+    var flipped = false;
+    S.slots.forEach(function(s, i){
+      if(!s) return;
+      var node = $("g-plot").querySelector('[data-slot="'+i+'"]');
+      if(!node) return;
+      var ready = now() >= s.readyAt;
+      if(ready && !node.classList.contains("ready")){ flipped = true; return; }
+      if(!ready){
+        var total = byId[s.crop].secs*1000, left2 = s.readyAt - now();
+        var t = node.querySelector(".t"); if(t) t.textContent = (left2/1000).toFixed(1) + "s";
+        var b = node.querySelector(".bar-mini i");
+        if(b) b.style.width = Math.max(0, Math.min(100, (1 - left2/total)*100)) + "%";
+      }
+    });
+    if(flipped) render();
+  }
+
+  // ---------- rendering ----------
+  function render(){
+    var r = S.round;
+    $("g-eyebrow").textContent = "Round " + r;
+    $("g-title").textContent = r === 1 ? "The build you have today"
+                             : r === 2 ? "Prices that move"
+                                       : "Slow crops, fast floor";
+    $("g-sub").textContent = r === 1
+      ? "Fixed prices. Harvests auto-collect and auto-sell. Your only move is choosing what to sow."
+      : r === 2
+      ? "Prices shift overnight. Harvests go to storage — selling is your call, and so is taking a contract."
+      : "Crops still take minutes — a pitcher runs half the round. Prices reprice every 2s, contracts land on a 28s fuse, and the mill is always open. Click ready plots to harvest.";
+    $("g-clock-k").textContent = S.rt ? "Time left" : "Day";
+    if(!S.rt) $("g-day").textContent = S.day + " / " + DAYS;
+    $("g-cash").textContent = money(S.cash);
+    $("g-held").textContent = r === 1 ? "—" : heldCount() + " units";
+    $("g-net").textContent = money(netWorth());
+    $("g-dead-box").style.display = S.rt ? "" : "none";
+    $("btn-day").style.display = S.rt ? "none" : "";
+    $("btn-day").textContent = S.day >= DAYS ? "Finish round" : "Advance to day " + (S.day+1);
+    $("g-mkt-title").textContent = r === 1 ? "Price list" : "Market";
+    $("g-mkt-note").textContent = r === 1 ? "Fixed — never moves"
+                               : r === 2 ? "Moves overnight" : "Moves every 3s";
+    $("g-contract-card").style.display = r === 1 ? "none" : "";
+    $("g-mill-card").style.display = S.rt ? "" : "none";
+
+    renderRack(); renderPlot(); renderSow(); renderMarket();
+    if(r !== 1) renderContracts();
+    if(S.rt) renderMill();
+    $("g-log").innerHTML = S.log.slice(0,40).map(function(l){
+      return '<div class="'+(l.hl?"hl":"")+'">'+esc(l.t)+'</div>';
+    }).join("");
+  }
+
+  function renderPlot(){
+    var h = "";
+    S.slots.forEach(function(s, i){
+      if(!s){
+        if(S.rt){
+          var hc = S.held ? byId[S.held] : null;
+          var afford = hc && S.cash >= hc.cost;
+          var cheaper = !afford && CROPS.some(function(x){ return S.cash >= x.cost; });
+          h += '<button class="slot empty" data-quick="'+i+'"'+(afford?"":" disabled")+
+               '><span class="icon">'+(hc?hc.ic:"+")+'</span>'+
+               '<span class="tiny">'+(afford ? "Plant "+hc.nm
+                 : cheaper ? "Too dear — pick a cheaper seed"
+                 : "Sell something first")+'</span></button>';
+        } else {
+          h += '<button class="slot empty" data-sow="'+i+'"><span class="icon">+</span>'+
+               '<span class="tiny">Sow</span></button>';
+        }
+        return;
+      }
+      var c = byId[s.crop];
+      if(S.rt){
+        var ready = now() >= s.readyAt;
+        if(ready){
+          h += '<button class="slot ready" data-slot="'+i+'" data-harvest="'+i+'">'+
+               '<span class="icon">'+c.ic+'</span><span class="nm">'+c.nm+'</span>'+
+               '<span class="tiny">Harvest</span></button>';
+        } else {
+          var fc = fertCost(c);
+          h += '<div class="slot" data-slot="'+i+'"><span class="icon">'+c.ic+'</span>'+
+               '<span class="nm">'+c.nm+'</span><span class="tiny num t">'+
+               ((s.readyAt-now())/1000).toFixed(1)+'s</span>'+
+               '<span class="bar-mini"><i></i></span>'+
+               '<button class="fert" data-fert="'+i+'"'+(S.cash<fc?" disabled":"")+
+               '>Fertilise '+money(fc)+'</button></div>';
+        }
+      } else {
+        var rd = S.day >= s.ready, left = s.ready - S.day;
+        h += '<div class="slot'+(rd?" ready":"")+'" data-slot="'+i+'"><span class="icon">'+c.ic+'</span>'+
+             '<span class="nm">'+c.nm+'</span><span class="tiny num">'+
+             (rd ? "Ready" : left + "d left") + '</span></div>';
+      }
+    });
+    $("g-plot").innerHTML = h;
+    var plot = $("g-plot");
+    Array.prototype.forEach.call(plot.querySelectorAll("[data-sow]"), function(b){
+      b.addEventListener("click", function(){
+        S.m.plantClicks++;
+        S.sowFor = parseInt(b.getAttribute("data-sow"), 10); render();
+      });
+    });
+    Array.prototype.forEach.call(plot.querySelectorAll("[data-quick]"), function(b){
+      b.addEventListener("click", function(){
+        S.sowFor = parseInt(b.getAttribute("data-quick"), 10);
+        plant(S.held);
+      });
+    });
+    Array.prototype.forEach.call(plot.querySelectorAll("[data-harvest]"), function(b){
+      b.addEventListener("click", function(){ harvest(parseInt(b.getAttribute("data-harvest"),10)); });
+    });
+    Array.prototype.forEach.call(plot.querySelectorAll("[data-fert]"), function(b){
+      b.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        fertilise(parseInt(b.getAttribute("data-fert"),10));
+      });
+    });
+    $("g-plothint").textContent = S.slots.every(function(x){return x;}) ? "All plots sown"
+                                 : (S.rt ? "Click to sow · click ready plots to harvest" : "Click a plot to sow");
+  }
+
+  function renderRack(){
+    var box = $("g-rack");
+    box.style.display = S.rt ? "" : "none";
+    if(!S.rt) return;
+    var heldOk = S.held && S.cash >= byId[S.held].cost;
+    var note = heldOk
+      ? "Seed in hand &mdash; click a plot to plant it, no menu"
+      : '<span class="dn">You can\'t afford the seed you\'re holding. Pick a cheaper one below.</span>';
+    var h = '<div class="tiny">'+note+'</div><div class="row g8">';
+    CROPS.forEach(function(c){
+      var on = S.held === c.id, can = S.cash >= c.cost;
+      h += '<button data-hold="'+c.id+'"'+(can?"":" disabled")+
+           (on?' class="primary"':"")+' style="padding:6px 10px">'+c.ic+
+           ' <span class="num tiny">'+money(c.cost)+'</span></button>';
+    });
+    box.innerHTML = h + "</div>";
+    Array.prototype.forEach.call(box.querySelectorAll("[data-hold]"), function(b){
+      b.addEventListener("click", function(){
+        S.held = b.getAttribute("data-hold");
+        S.m.plantClicks++;
+        render();
+      });
+    });
+  }
+
+  function renderSow(){
+    var box = $("g-sowbox");
+    if(S.sowFor === null){ box.innerHTML = ""; return; }
+    var h = '<hr><div class="tiny">Sow plot '+(S.sowFor+1)+'</div><div class="stack g8">';
+    CROPS.forEach(function(c){
+      var can = S.cash >= c.cost;
+      h += '<button data-plant="'+c.id+'"'+(can?"":" disabled")+
+           ' style="display:flex;justify-content:space-between;gap:10px;text-align:left">'+
+           '<span>'+c.ic+' '+c.nm+'</span>'+
+           '<span class="num tiny">'+money(c.cost)+' · '+(S.rt ? c.secs+"s" : c.days+"d")+'</span></button>';
+    });
+    h += '</div><button data-cancel="1">Cancel</button>';
+    box.innerHTML = h;
+    Array.prototype.forEach.call(box.querySelectorAll("[data-plant]"), function(b){
+      b.addEventListener("click", function(){ plant(b.getAttribute("data-plant")); });
+    });
+    box.querySelector("[data-cancel]").addEventListener("click", function(){ S.sowFor = null; render(); });
+  }
+
+  function renderMarket(){
+    var live = S.round !== 1;
+    var h = "<thead><tr><th>Crop</th><th>Seed</th><th>"+(S.rt?"Secs":"Days")+"</th><th>"+
+            (live?"Spot":"Sells for")+"</th>"+
+            (live?"<th>Chg</th><th>Trend</th><th></th>":"")+"</tr></thead><tbody>";
+    CROPS.forEach(function(c){
+      var p = S.price[c.id], hs = S.hist[c.id];
+      var prev = hs.length > 1 ? hs[hs.length-2] : p;
+      var pct = prev ? ((p-prev)/prev*100) : 0;
+      var have = (S.inv[c.id]||[]).length;
+      h += "<tr><td>"+c.ic+" "+c.nm+' <span class="tk">'+c.tk+"</span></td>"+
+           "<td>"+money(c.cost)+"</td><td>"+(S.rt?c.secs:c.days)+"</td><td>"+money(p)+"</td>";
+      if(live){
+        var cl = pct > 0.5 ? "up" : (pct < -0.5 ? "dn" : "neutral");
+        h += '<td><span class="chip '+cl+'">'+(pct>0?"+":"")+pct.toFixed(1)+"%</span></td>"+
+             "<td>"+spark(hs)+"</td><td>"+
+             (have ? '<button data-sell="'+c.id+'">Sell '+have+"</button>" : "") + "</td>";
+      }
+      h += "</tr>";
+    });
+    $("g-market").innerHTML = h + "</tbody>";
+    Array.prototype.forEach.call($("g-market").querySelectorAll("[data-sell]"), function(b){
+      b.addEventListener("click", function(){ sell(b.getAttribute("data-sell")); });
+    });
+  }
+
+  function spark(hs){
+    if(hs.length < 2) return "";
+    var w = 58, ht = 17, mn = Math.min.apply(null,hs), mx = Math.max.apply(null,hs), rg = mx-mn || 1;
+    var pts = hs.map(function(v,i){
+      return (i/(hs.length-1)*w).toFixed(1) + "," + (ht - (v-mn)/rg*ht).toFixed(1);
+    }).join(" ");
+    var rising = hs[hs.length-1] >= hs[0];
+    return '<svg width="'+w+'" height="'+ht+'" viewBox="0 0 '+w+' '+ht+'" aria-hidden="true">'+
+           '<polyline points="'+pts+'" fill="none" stroke="'+(rising?"var(--gain)":"var(--loss)")+
+           '" stroke-width="1.4"/></svg>';
+  }
+
+  function renderContracts(){
+    var box = $("g-contracts"), open = S.contracts.filter(function(c){ return c.state !== "done"; });
+    if(!open.length){ box.innerHTML = '<p class="tiny">No contracts on the board right now.</p>'; return; }
+    box.innerHTML = open.map(function(c){
+      var cr = byId[c.crop], total = c.qty * c.unit, spot = S.price[c.crop] * c.qty;
+      var diff = total - spot;
+      var when = S.rt ? "in " + Math.max(0, Math.round(c.due - elapsed())) + "s" : "by day " + c.due;
+      var line = cr.ic + " " + c.qty + " × " + cr.nm + " " + when +
+                 " — " + money(c.unit) + "/unit (" + money(total) + " total)";
+      var vs = '<span class="tiny">Spot right now: ' + money(spot) + " · " +
+               '<span class="' + (diff>=0?"up":"dn") + '">' +
+               (diff>=0 ? "contract pays " + money(diff) + " more" : "spot pays " + money(-diff) + " more") +
+               "</span></span>";
+      if(c.state === "offered"){
+        return '<div class="card stack g8" style="background:var(--panel-2)"><div>'+esc(line)+"</div>"+vs+
+               '<div class="row g8"><button class="primary" data-acc="'+c.id+'">Accept</button>'+
+               '<button data-dec="'+c.id+'">Decline</button></div></div>';
+      }
+      var have = (S.inv[c.crop]||[]).length;
+      return '<div class="card stack g8" style="background:var(--panel-2)"><div>'+esc(line)+"</div>"+
+             '<span class="tiny">Accepted · you hold '+have+" of "+c.qty+
+             " · delivers automatically</span></div>";
+    }).join("");
+    Array.prototype.forEach.call(box.querySelectorAll("[data-acc]"), function(b){
+      b.addEventListener("click", function(){ contract(b.getAttribute("data-acc"), true); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-dec]"), function(b){
+      b.addEventListener("click", function(){ contract(b.getAttribute("data-dec"), false); });
+    });
+  }
+
+  function renderMill(){
+    var box = $("g-mill"), rows = [];
+    CROPS.forEach(function(c){
+      var raw = (S.inv[c.id]||[]).length, bat = S.batch[c.id]||0;
+      if(!raw && !bat) return;
+      var bits = '<div class="row g8" style="justify-content:space-between;width:100%">'+
+        '<span>'+c.ic+' '+c.nm+' <span class="tiny">'+raw+' raw · '+bat+' batch</span></span>'+
+        '<span class="row g8">';
+      if(raw >= 2) bits += '<button data-mill="'+c.id+'">Mill 2</button>';
+      if(bat) bits += '<button class="primary" data-sellbatch="'+c.id+'">Sell batch · '+
+                      money(Math.round(S.price[c.id]*BATCH_MULT))+"</button>";
+      bits += "</span></div>";
+      rows.push(bits);
+    });
+    var starving = !canMill();
+    $("g-mill-card").classList.toggle("starve", starving);
+    var head = starving
+      ? '<div class="banner dead" style="font-size:13px">Mill idle &mdash; nothing to run. It needs '+
+        '2 of any crop. Your farm is the bottleneck, not the machine.</div>'
+      : "";
+    box.innerHTML = head + (rows.length ? rows.join("")
+      : '<p class="tiny">Nothing in storage yet. Harvest something and the mill opens up.</p>');
+    Array.prototype.forEach.call(box.querySelectorAll("[data-mill]"), function(b){
+      b.addEventListener("click", function(){ mill(b.getAttribute("data-mill")); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-sellbatch]"), function(b){
+      b.addEventListener("click", function(){ sellBatch(b.getAttribute("data-sellbatch")); });
+    });
+  }
+
+  // ---------- actions ----------
+  function think(){ S.m.think.push(now() - S.dayStart); S.m.actions++; if(S.rt) S.dayStart = now(); }
+
+  function fertilise(i){
+    var s = S.slots[i];
+    if(!s || now() >= s.readyAt) return;
+    var c = byId[s.crop], cost = fertCost(c);
+    if(S.cash < cost) return;
+    think();
+    S.cash -= cost;
+    var remaining = s.readyAt - now();
+    s.readyAt = now() + Math.round(remaining/2);
+    S.m.fert++; S.m.fertSpend += cost;
+    if(S.m.firstFertAt === null) S.m.firstFertAt = elapsed();
+    log("Fertilised " + c.nm + " for " + money(cost) + " — " +
+        (remaining/2000).toFixed(1) + "s saved.", true);
+    render();
+  }
+
+  function mill(id){
+    var st = S.inv[id];
+    if(!st || st.length < 2) return;
+    think();
+    st.splice(0, 2);
+    S.batch[id] = (S.batch[id]||0) + 1;
+    S.m.milled++;
+    log("Milled 2 × " + byId[id].nm + " into a batch.");
+    render();
+  }
+
+  function sellBatch(id){
+    var n = S.batch[id]||0;
+    if(!n) return;
+    think();
+    var p = Math.round(S.price[id]*BATCH_MULT), gross = n*p;
+    S.batch[id] = 0; S.cash += gross; S.m.sells++;
+    log("Sold " + n + " × " + byId[id].nm + " batch at " + money(p) + " — " + money(gross) + ".", true);
+    render();
+  }
+
+  function plant(id){
+    var c = byId[id];
+    if(S.cash < c.cost || S.sowFor === null) return;
+    think();
+    var budget = S.cash;
+    S.cash -= c.cost;
+    S.slots[S.sowFor] = S.rt
+      ? {crop:id, readyAt: now() + c.secs*1000}
+      : {crop:id, ready: S.day + c.days};
+    S.m.planted[id] = (S.m.planted[id]||0) + 1;
+    S.m.plantCount++;
+    S.m.plantClicks++;
+    var best = null;
+    CROPS.forEach(function(x){ if(x.cost <= budget && (!best || x.val > best.val)) best = x; });
+    if(best && best.id === id) S.m.topShare++;
+    log("Sowed " + c.nm + " in plot " + (S.sowFor+1) + " for " + money(c.cost) + ".");
+    S.sowFor = null;
+    render();
+  }
+
+  function harvest(i){
+    var s = S.slots[i];
+    if(!s || now() < s.readyAt) return;
+    think();
+    var c = byId[s.crop];
+    if(!S.inv[c.id]) S.inv[c.id] = [];
+    S.inv[c.id].push(elapsed());
+    S.slots[i] = null;
+    log("Harvested 1 × " + c.nm + ".");
+    render();
+  }
+
+  function sell(id){
+    var st = S.inv[id];
+    if(!st || !st.length) return;
+    think();
+    var c = byId[id], p = S.price[id], n = st.length, gross = n * p;
+    var t = S.rt ? elapsed() : S.day;
+    st.forEach(function(d){ S.m.holdDays.push(t - d); });
+    S.cash += gross; S.inv[id] = []; S.m.sells++;
+    S.price[id] = Math.max(Math.round(c.val*0.5), Math.round(p * (1 - 0.015*n)));
+    log("Sold " + n + " × " + c.nm + " at " + money(p) + " — " + money(gross) + ".", true);
+    render();
+  }
+
+  function contract(cid, accept){
+    var c = S.contracts.filter(function(x){ return x.id === cid; })[0];
+    if(!c || c.state !== "offered") return;
+    think();
+    if(accept){
+      c.state = "accepted";
+      S.m.cAcc++;
+      log("Accepted contract: " + c.qty + " × " + byId[c.crop].nm + ".", true);
+    } else {
+      c.state = "done";
+      log("Declined a contract.");
+    }
+    render();
+  }
+
+  function advance(){
+    if(S.over || S.rt) return;
+    S.slots.forEach(function(s, i){
+      if(s && S.day >= s.ready){
+        var c = byId[s.crop];
+        if(S.round === 1){
+          S.cash += c.val;
+          log("Auto Merchant sold 1 × " + c.nm + " for " + money(c.val) + ". You did nothing.");
+        } else {
+          if(!S.inv[c.id]) S.inv[c.id] = [];
+          S.inv[c.id].push(S.day);
+          log("Harvested 1 × " + c.nm + " into storage.");
+        }
+        S.slots[i] = null;
+      }
+    });
+
+    if(S.day >= DAYS){ finish(); return; }
+    S.day++;
+
+    if(S.round === 2){
+      CROPS.forEach(function(c){
+        var drift = (Math.random()*2 - 1) * c.vol;
+        var np = Math.max(c.val*0.55, Math.min(c.val*1.9, S.price[c.id] * (1 + drift)));
+        S.price[c.id] = Math.round(np);
+        S.hist[c.id].push(S.price[c.id]);
+      });
+      if(Math.random() < 0.45){
+        var c2 = CROPS[Math.floor(Math.random()*CROPS.length)];
+        var up = Math.random() < 0.5, mag = 0.22 + Math.random()*0.18;
+        S.price[c2.id] = Math.round(Math.max(c2.val*0.55,
+          Math.min(c2.val*1.9, S.price[c2.id] * (1 + (up?mag:-mag)))));
+        S.hist[c2.id][S.hist[c2.id].length-1] = S.price[c2.id];
+        log((up ? "Bulk order lands — " : "Glut in the market — ") + c2.nm + " " +
+            (up?"+":"−") + Math.round(mag*100) + "%.", true);
+      }
+      S.contracts.forEach(function(ct){
+        if(ct.state !== "accepted" || S.day < ct.due) return;
+        var st = S.inv[ct.crop] || [], cr = byId[ct.crop];
+        if(st.length >= ct.qty){
+          st.splice(0, ct.qty);
+          S.cash += ct.qty * ct.unit;
+          log("Contract delivered: " + ct.qty + " × " + cr.nm + " for " + money(ct.qty*ct.unit) + ".", true);
+        } else {
+          var fee = Math.min(S.cash, Math.round(ct.qty * ct.unit * 0.08));
+          S.cash -= fee;
+          log("Contract failed — short on " + cr.nm + ". Penalty " + money(fee) + ".", true);
+        }
+        ct.state = "done";
+      });
+      if(S.day === 4) offerContract(4);
+      // dead-air proxy for turn-based rounds: a day with no affordable move
+      S.m.samples++;
+      if(!S.slots.some(function(x){return !x;}) || S.cash < CHEAPEST) S.m.dead++;
+    } else {
+      S.m.samples++;
+      if(!S.slots.some(function(x){return !x;}) || S.cash < CHEAPEST) S.m.dead++;
+    }
+
+    antiStall();
+    S.dayStart = now();
+    S.sowFor = null;
+    render();
+  }
+
+  function finish(){
+    if(S.over) return;
+    S.over = true;
+    if(timer){ clearInterval(timer); timer = null; }
+    var liq = netWorth();
+    var m = S.m, dur = S.rt ? RT_SECONDS/60 : null;
+    M[S.round] = {
+      rt: S.rt, net: liq, profit: liq - START,
+      distinct: Object.keys(m.planted).length,
+      planted: m.planted, plantCount: m.plantCount,
+      topShare: m.plantCount ? m.topShare/m.plantCount : 0,
+      medThink: med(m.think), actions: m.actions,
+      apm: dur ? m.actions/dur : null,
+      sells: m.sells,
+      avgHold: m.holdDays.length ? m.holdDays.reduce(function(a,b){return a+b;},0)/m.holdDays.length : 0,
+      cAcc: m.cAcc, cOff: Math.max(0, m.cOff), milled: m.milled,
+      clicksPerPlant: m.plantCount ? m.plantClicks/m.plantCount : 0,
+      fert: m.fert, fertSpend: m.fertSpend, firstFertAt: m.firstFertAt,
+      starved: m.starved, starvedPct: m.samples ? m.starved/m.samples : 0,
+      dead: m.dead, samples: m.samples,
+      deadPct: m.samples ? m.dead/m.samples : 0
+    };
+    if(S.round < 3) midScreen(S.round); else debrief();
+  }
+
+  // ---------- interstitial ----------
+  function midScreen(r){
+    var d = M[r], lines = [];
+    if(r === 1){
+      $("mid-eyebrow").textContent = "Round 1 complete";
+      $("mid-h").textContent = "Eight days of the current build";
+      lines.push("Finished with <strong>"+money(d.net)+"</strong>, up "+money(d.profit)+" from "+money(START)+".");
+      lines.push("You planted <strong>"+d.distinct+" of 6</strong> crops across "+d.plantCount+" sowings.");
+      lines.push("Median time on a decision: <strong>"+(d.medThink/1000).toFixed(1)+"s</strong>.");
+      lines.push("<strong>"+Math.round(d.topShare*100)+"%</strong> of your sowings were the priciest crop you could afford.");
+      lines.push("Total actions across eight days: <strong>"+d.actions+"</strong>. Every harvest sold itself.");
+      $("btn-next").textContent = "Start Round 2";
+      $("mid-note").textContent = "Same crops and costs. Prices move and nothing sells itself.";
+      $("mid-body").innerHTML = '<ul class="tight">'+lines.map(function(l){return "<li>"+l+"</li>";}).join("")+"</ul>"+
+        '<div class="banner">Hold on to that action count.</div>';
+    } else {
+      var a = M[1];
+      $("mid-eyebrow").textContent = "Round 2 complete";
+      $("mid-h").textContent = "Same eight days, with decisions in them";
+      lines.push("Finished with <strong>"+money(d.net)+"</strong> against "+money(a.net)+" in Round 1.");
+      lines.push("Crop variety: <strong>"+d.distinct+"</strong> vs "+a.distinct+".");
+      lines.push("Actions taken: <strong>"+d.actions+"</strong> vs "+a.actions+".");
+      lines.push("Median decision time: <strong>"+(d.medThink/1000).toFixed(1)+"s</strong> vs "+(a.medThink/1000).toFixed(1)+"s.");
+      lines.push("You made <strong>"+d.sells+"</strong> selling decisions and took "+d.cAcc+" of "+d.cOff+" contracts.");
+      $("btn-next").textContent = "Start Round 3 — real time";
+      $("mid-note").textContent = "Three minutes, no pausing. Crops in seconds.";
+      $("mid-body").innerHTML = '<ul class="tight">'+lines.map(function(l){return "<li>"+l+"</li>";}).join("")+"</ul>"+
+        '<div class="banner">Round 3 tests your fix. The crops are deliberately <em>still slow</em> — '+
+        'a pitcher takes half the round. What changes is that a fast layer sits in front of them: live '+
+        'prices, short-fuse contracts, and a mill that is always open. It runs on a real clock and '+
+        'counts every second you have nothing to do.</div>';
+    }
+    show("s-mid");
+  }
+
+  // ---------- debrief ----------
+  var QUESTIONS = [
+    {id:"keep", q:"Which round did you actually want to keep playing?",
+     o:["Round 1 — the current build","Round 2 — prices that move","Round 3 — slow crops, fast floor","None of them"]},
+    {id:"pace", q:"In Round 3 the crops were still slow. Did the fast layer cover for that?",
+     o:["Yes — I never noticed the crops were slow","Mostly, but it needs one more thing to do","No — I still felt the wait","No, and it was too busy to enjoy"]},
+    {id:"fastlayer", q:"Which fast layer is worth building for real?",
+     o:["Live market — timing your sells","Short-fuse contracts — orders to chase","The mill — turning raw goods into better goods","All three, or something else entirely"]},
+    {id:"gap", q:"How starved should a player's machines be when they aren't buying fertiliser?",
+     o:["Barely — the gap is a nudge, not a wall","Around a third of the time idle","Half the time idle — the pressure should be obvious","Machines should always outrun the farm badly"]},
+    {id:"freeroute", q:"What's the non-paying route past the bottleneck?",
+     o:["Compost — turn waste crops back into fertiliser","Playtime grants — earn some free each session","Buy it with in-game currency, just expensively","There shouldn't be one"]},
+    {id:"loss", q:"Should a player be able to lose money on a bad decision?",
+     o:["Never — income only goes up","Small losses only, capped","Yes — real stakes, real losses","Only if they opt into risk"]},
+    {id:"offline", q:"Hired farmers while the owner is logged off:",
+     o:["Work fully, as they do today","Work, but hard-capped per day","Don't work at all","Work only on crops already sown"]},
+    {id:"top", q:"The top-tier crop should feel like:",
+     o:["A dependable blue chip","A volatile jackpot","Something you process, never sell raw","A crop you can't grow alone"]},
+    {id:"session", q:"A satisfying session on your server is about:",
+     o:["15 minutes","45 minutes","2+ hours","Brief check-ins, several times a day"]},
+    {id:"boring", q:"What's the single most boring thing about the server as it is today?", free:true},
+    {id:"best", q:"Describe the best possible ten minutes a player could have on your server.", free:true}
+  ];
+
+  function debrief(){
+    var a = M[1], b = M[2], c = M[3];
+
+    var verdict, vclass;
+    if(c.deadPct <= 0.08){
+      verdict = "<strong>The fast layer works.</strong> Crops were deliberately left slow in Round 3 — " +
+        "a pitcher took half the round — and you still had nothing to do for only " + c.dead + " of " +
+        c.samples + " seconds (" + Math.round(c.deadPct*100) + "%). That is the finding: you never needed " +
+        "shorter grow times, you needed something to do while they run. Keep the slow crops, build the floor.";
+      vclass = "banner";
+    } else if(c.deadPct <= 0.25){
+      verdict = "<strong>The fast layer helped, but has holes.</strong> You still spent " + c.dead +
+        " of " + c.samples + " seconds (" + Math.round(c.deadPct*100) + "%) with no move available. " +
+        "The direction is right — a foreground activity over slow crops — but this particular floor " +
+        "(market, contracts, mill) doesn't quite cover the gaps. It needs one more verb, not shorter timers.";
+      vclass = "banner";
+    } else {
+      verdict = "<strong>The fast layer didn't cover it.</strong> You spent " + c.dead + " of " +
+        c.samples + " seconds (" + Math.round(c.deadPct*100) + "%) with no action available even with " +
+        "live prices, rolling contracts and an open mill. Before committing a build, worth checking " +
+        "whether the dead air came from having no stock to work with — which is a crop-yield problem, " +
+        "not a pacing one.";
+      vclass = "banner dead";
+    }
+    $("d-verdict").innerHTML = '<div class="'+vclass+'">'+verdict+"</div>";
+
+    var rows = [
+      ["Ending net worth", money(a.net), money(b.net), money(c.net)],
+      ["Profit", money(a.profit), money(b.profit), money(c.profit)],
+      ["Distinct crops planted", a.distinct+" / 6", b.distinct+" / 6", c.distinct+" / 6"],
+      ["Priciest-affordable sowings", Math.round(a.topShare*100)+"%", Math.round(b.topShare*100)+"%", Math.round(c.topShare*100)+"%"],
+      ["Median time per decision", (a.medThink/1000).toFixed(1)+"s", (b.medThink/1000).toFixed(1)+"s", (c.medThink/1000).toFixed(1)+"s"],
+      ["Actions taken", a.actions, b.actions, c.actions],
+      ["Clicks per plant", a.clicksPerPlant.toFixed(1)+" (menu)", b.clicksPerPlant.toFixed(1)+" (menu)", c.clicksPerPlant.toFixed(1)+" (in hand)"],
+      ["Actions per minute", "—", "—", c.apm ? c.apm.toFixed(1) : "—"],
+      ["Time with no action available", Math.round(a.deadPct*100)+"% of days", Math.round(b.deadPct*100)+"% of days", c.dead+"s of "+c.samples+"s ("+Math.round(c.deadPct*100)+"%)"],
+      ["Manual sells", "0 (automated)", b.sells, c.sells],
+      ["Batches milled", "—", "—", c.milled],
+      ["Mill starved (nothing to run)", "—", "—", c.starved+"s of "+c.samples+"s ("+Math.round(c.starvedPct*100)+"%)"],
+      ["Fertiliser bought", "—", "—", c.fert + (c.fert ? " · " + money(c.fertSpend) : "")],
+      ["First reached for fertiliser", "—", "—", c.firstFertAt === null ? "never" : Math.round(c.firstFertAt)+"s in"],
+      ["Contracts accepted", "—", b.cAcc+" / "+b.cOff, c.cAcc+" / "+c.cOff]
+    ];
+    $("d-compare").innerHTML = "<thead><tr><th>Measure</th><th>R1 · today</th>"+
+      "<th>R2 · decisions</th><th>R3 · fast</th></tr></thead><tbody>" +
+      rows.map(function(r){
+        return "<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td></tr>";
+      }).join("") + "</tbody>";
+
+    var reads = [];
+    if(c.apm) reads.push("Round 3 ran at " + c.apm.toFixed(1) + " actions per minute against " +
+      a.actions + " actions across all of Round 1. That ratio is the pacing change, stated plainly.");
+    if(b.distinct > a.distinct)
+      reads.push("Moving prices made you diversify — " + a.distinct + " crops became " + b.distinct + ".");
+    if(c.distinct < b.distinct)
+      reads.push("You planted fewer distinct crops under time pressure (" + c.distinct + " vs " + b.distinct +
+        "). Speed can crowd out the thinking that makes variety worthwhile — worth watching if you want both.");
+    if(c.distinct > b.distinct)
+      reads.push("Variety went up under time pressure, not down. Fast and thoughtful aren't in tension here.");
+    if(a.topShare > 0.7)
+      reads.push(Math.round(a.topShare*100) + "% of your Round 1 sowings were simply the priciest crop you could afford — the dominated-ladder problem in your own play.");
+    if(c.profit > a.profit * 3)
+      reads.push("Round 3 earned " + (c.profit/Math.max(1,a.profit)).toFixed(1) + "× Round 1's profit in three minutes. Even with slow crops, adding a fast floor raises the income rate — the economy needs re-deriving around whatever floor you pick.");
+    if(c.cOff > 0 && c.cAcc === 0)
+      reads.push("You ignored every contract in Round 3. Short fuses may have made them feel like noise rather than opportunity.");
+    if(c.milled === 0)
+      reads.push("You never touched the mill. Either it wasn't legible as an option, or converting raw goods isn't interesting enough to be the thing that fills the wait.");
+    else if(c.milled >= c.sells)
+      reads.push("You milled " + c.milled + " batches — the mill absorbed as much attention as selling did. That's a strong signal for processing as the foreground activity.");
+
+    if(a.clicksPerPlant && c.clicksPerPlant)
+      reads.push("Menu planting cost " + a.clicksPerPlant.toFixed(1) + " clicks per plant; seed-in-hand cost " +
+        c.clicksPerPlant.toFixed(1) + ". Over a session that difference is the friction you were feeling — " +
+        "and it lands entirely on the fast half of the loop, where it hurts most.");
+
+    reads.push("The mill sat starved " + Math.round(c.starvedPct*100) + "% of the round. That figure is " +
+      "the gap between what your machines can eat and what your farm can grow — it is the surface the " +
+      "fertiliser sits on, and the single number worth tuning deliberately rather than by accident.");
+    if(c.fert === 0)
+      reads.push("You never bought fertiliser. With the mill starved " + Math.round(c.starvedPct*100) +
+        "% of the time, that means the bottleneck either wasn't painful enough to act on, or wasn't visible " +
+        "at the moment it bit. Pressure nobody notices doesn't convert.");
+    else
+      reads.push("You reached for fertiliser " + c.fert + " times, first at " + Math.round(c.firstFertAt) +
+        "s, spending " + money(c.fertSpend) + " (" + Math.round(c.fertSpend/Math.max(1,c.profit+c.fertSpend)*100) +
+        "% of what you earned). That first-reach timestamp is your conversion moment — it tells you how long " +
+        "a new player tolerates the gap before they want it gone.");
+
+    $("d-reads").innerHTML = '<hr><span class="eyebrow">Reading it</span>' +
+      '<ul class="tight">' + reads.map(function(r){ return "<li>"+r+"</li>"; }).join("") + "</ul>";
+
+    var best = 0;
+    var balRows = CROPS.map(function(cr){
+      var ppd = (cr.val - cr.cost)/cr.days, dominated = ppd < best;
+      if(ppd > best) best = ppd;
+      return "<tr><td>"+cr.ic+" "+cr.nm+"</td><td>"+money(cr.cost)+"</td><td>"+money(cr.val)+
+             "</td><td>"+cr.days+"</td><td>"+money(ppd)+"</td><td>"+
+             (dominated ? '<span class="chip dn">never optimal</span>'
+                        : '<span class="chip up">holds its rung</span>')+"</td></tr>";
+    }).join("");
+    $("d-balance").innerHTML = "<thead><tr><th>Crop</th><th>Seed</th><th>Sells</th><th>Days</th>"+
+      "<th>Profit/day</th><th></th></tr></thead><tbody>"+balRows+"</tbody>";
+
+    $("d-questions").innerHTML = QUESTIONS.map(function(q){
+      if(q.free){
+        return '<fieldset><legend>'+esc(q.q)+"</legend>"+
+               '<textarea id="q-'+q.id+'" placeholder="Say it plainly — this goes straight into the brief."></textarea></fieldset>';
+      }
+      return '<fieldset><legend>'+esc(q.q)+'</legend><div class="opts">'+
+        q.o.map(function(o){
+          return '<label class="opt"><input type="radio" name="q-'+q.id+'" value="'+esc(o)+
+                 '"><span>'+esc(o)+"</span></label>";
+        }).join("") + "</div></fieldset>";
+    }).join("");
+
+    show("s-debrief");
+  }
+
+  // ---------- brief ----------
+  function buildBrief(){
+    var a = M[1], b = M[2], c = M[3], L = [];
+    function mix(p){
+      var ks = Object.keys(p);
+      if(!ks.length) return "none";
+      return ks.map(function(k){ return byId[k].nm + " x" + p[k]; }).join(", ");
+    }
+    L.push("# Lofts — farming & economy redesign brief");
+    L.push("");
+    L.push("Generated from a three-round A/B/C playtest run by the server owner.");
+    L.push("");
+    L.push("- Round 1 reproduced the shipped build: fixed prices, auto-collect, Auto Merchant selling. Turn-based, 8 days.");
+    L.push("- Round 2 modelled decision-making: moving prices, manual selling, contracts as hedges. Turn-based, 8 days.");
+    L.push("- Round 3 modelled the owner's own design — a three-speed economy. Real time, 180 seconds.");
+    L.push("");
+    L.push("## The three-speed model (target design)");
+    L.push("");
+    L.push("1. CROPS ARE SLOW. 20-95s in the prototype; a top-tier crop runs half the session. This is the");
+    L.push("   supply constraint and it should stay slow. Do NOT compress grow times.");
+    L.push("2. MACHINES ARE FAST. The mill converts 2 raw units into 1 batch worth 1.2x, instantly, as often");
+    L.push("   as it is fed. Machine throughput deliberately EXCEEDS what the farm can supply.");
+    L.push("3. FERTILISER BRIDGES THEM. It halves the remaining grow time on any crop, for a fee. It is the");
+    L.push("   toll between the slow half and the fast half, and it is the monetised item.");
+    L.push("");
+    L.push("## Planting UX change (decided)");
+    L.push("");
+    L.push("Replace GUI planting with vanilla-style planting from the hand. Seeds become real inventory");
+    L.push("items bought from a vendor, not a purchase transaction fired at the moment of placement.");
+    L.push("Consequences the developer must handle:");
+    L.push("");
+    L.push("- Point of sale moves from farmland to the seed vendor. The economy audit trail");
+    L.push("  (economy.itemAudit) must follow it, or seed spend disappears from the dashboard.");
+    L.push("- Seeds become tradeable between players, and usable as contract rewards and drops.");
+    L.push("- SEED DURABILITY, not a recovery chance: each seed carries N plantings, tapered by tier");
+    L.push("  (cheap crops ~8, top tier ~2), with the remaining count visible on the item. This yields");
+    L.push("  the same expected sink as a probability roll without bad-luck spirals on expensive seeds.");
+    L.push("  Sink size follows plantings-per-seed = 1/(1-r); pick N per tier against a target sink.");
+    L.push("- Misplant protection is needed on the top two tiers. A $1,120 pitcher seed placed by accident");
+    L.push("  currently refunds 50% on break (immatureRefundPercent), i.e. a $560 mistake from one click.");
+    L.push("");
+    L.push("The design consequence the developer must hold on to: the gap between machine throughput and");
+    L.push("farm output IS the product. Machine idle time is not a bug to be tuned away — it is the pressure");
+    L.push("the fertiliser relieves. It must be deliberately sized, and it must be VISIBLE in the UI at the");
+    L.push("moment it bites, or it creates frustration without creating demand.");
+    L.push("");
+    L.push("The question Round 3 answers: does the fast machine layer cover for slow crops, and does the");
+    L.push("resulting supply gap register as motivating pressure rather than as a wall?");
+    L.push("");
+    L.push("All rounds: 6 plots, $2,000 start. Crop costs, sale values and relative grow times from config.yml.");
+    L.push("");
+    L.push("## Measured behaviour");
+    L.push("");
+    L.push("| Measure | R1 (today) | R2 (decisions) | R3 (fast) |");
+    L.push("| --- | --- | --- | --- |");
+    L.push("| Ending net worth | "+money(a.net)+" | "+money(b.net)+" | "+money(c.net)+" |");
+    L.push("| Profit | "+money(a.profit)+" | "+money(b.profit)+" | "+money(c.profit)+" |");
+    L.push("| Distinct crops planted | "+a.distinct+"/6 | "+b.distinct+"/6 | "+c.distinct+"/6 |");
+    L.push("| Priciest-affordable sowings | "+Math.round(a.topShare*100)+"% | "+Math.round(b.topShare*100)+"% | "+Math.round(c.topShare*100)+"% |");
+    L.push("| Median time per decision | "+(a.medThink/1000).toFixed(1)+"s | "+(b.medThink/1000).toFixed(1)+"s | "+(c.medThink/1000).toFixed(1)+"s |");
+    L.push("| Actions taken | "+a.actions+" | "+b.actions+" | "+c.actions+" |");
+    L.push("| Clicks per plant | "+a.clicksPerPlant.toFixed(1)+" (menu) | "+b.clicksPerPlant.toFixed(1)+" (menu) | "+c.clicksPerPlant.toFixed(1)+" (seed in hand) |");
+    L.push("| Actions per minute | n/a | n/a | "+(c.apm?c.apm.toFixed(1):"n/a")+" |");
+    L.push("| Time with no action available | "+Math.round(a.deadPct*100)+"% of days | "+Math.round(b.deadPct*100)+"% of days | "+c.dead+"s of "+c.samples+"s ("+Math.round(c.deadPct*100)+"%) |");
+    L.push("| Manual sells | 0 (automated) | "+b.sells+" | "+c.sells+" |");
+    L.push("| Batches milled | n/a | n/a | "+c.milled+" |");
+    L.push("| Mill starved | n/a | n/a | "+c.starved+"s of "+c.samples+"s ("+Math.round(c.starvedPct*100)+"%) |");
+    L.push("| Fertiliser bought | n/a | n/a | "+c.fert+" ("+money(c.fertSpend)+") |");
+    L.push("| First fertiliser purchase | n/a | n/a | "+(c.firstFertAt===null?"never":Math.round(c.firstFertAt)+"s in")+" |");
+    L.push("| Contracts accepted | n/a | "+b.cAcc+"/"+b.cOff+" | "+c.cAcc+"/"+c.cOff+" |");
+    L.push("");
+    L.push("Crop mix — R1: "+mix(a.planted));
+    L.push("Crop mix — R2: "+mix(b.planted));
+    L.push("Crop mix — R3: "+mix(c.planted));
+    L.push("");
+    L.push("## Pacing verdict");
+    L.push("");
+    L.push("Round 3 kept grow times SLOW and added a fast foreground layer. Dead air: "+
+           Math.round(c.deadPct*100)+"% ("+c.dead+"s of "+c.samples+"s).");
+    L.push("");
+    if(c.deadPct <= 0.08){
+      L.push("VERDICT: the two-loop design works. Slow crops did not read as slow once there was a");
+      L.push("foreground activity. Do NOT compress grow times — that would multiply income for no gain.");
+      L.push("Build the foreground layer instead and leave the crop clock roughly where it is.");
+    } else if(c.deadPct <= 0.25){
+      L.push("VERDICT: two-loop is the right shape, this floor is not thick enough. Keep slow crops and");
+      L.push("keep the foreground layer, but add one more always-available verb before shipping.");
+      L.push("Re-measure dead air after adding it; target is under 8%.");
+    } else {
+      L.push("VERDICT: inconclusive — the floor did not cover the gaps. Check first whether dead air came");
+      L.push("from having no stock to work with (a yield problem) rather than nothing to do with stock (a");
+      L.push("pacing problem). Those have opposite fixes. Do not commit to a build until that is separated.");
+    }
+    L.push("");
+    L.push("## Supply gap — the tuning target");
+    L.push("");
+    L.push("Mill starved "+Math.round(c.starvedPct*100)+"% of the round. Fertiliser purchases: "+c.fert+
+           (c.firstFertAt===null ? " (never reached for)" : ", first at "+Math.round(c.firstFertAt)+"s"));
+    L.push("");
+    if(c.fert === 0 && c.starvedPct >= 0.2){
+      L.push("The machine sat idle a fifth of the round and the owner still never bought fertiliser. Treat");
+      L.push("this as the headline result: the bottleneck was not legible or not painful at the moment it");
+      L.push("bit. Before building the storefront, make idle capacity visible and re-measure.");
+    } else if(c.fert > 0 && c.starvedPct < 0.10){
+      L.push("Fertiliser was bought despite the mill rarely starving — demand came from wanting speed, not");
+      L.push("from relieving a blockage. That is a healthier place to sell from: the player is buying");
+      L.push("acceleration they chose, not a wall the design put in front of them.");
+    } else if(c.fert > 0){
+      L.push("Both signals present: measurable starvation and a real purchase. Size the gap deliberately —");
+      L.push("start from the observed "+Math.round(c.starvedPct*100)+"% and treat it as a tunable constant");
+      L.push("in config, not an emergent accident of crop timings.");
+    } else {
+      L.push("Neither starvation nor purchases registered strongly. The gap is currently too small to");
+      L.push("motivate anything. Widen machine throughput relative to farm output and re-measure.");
+    }
+    L.push("");
+    L.push("Free-player ceiling is the paired question the prototype does not answer: whatever gap gets set,");
+    L.push("there must be a non-paying route through it (compost, slow crafting, playtime grants), or the");
+    L.push("population that makes the player economy work never accumulates.");
+    L.push("");
+    L.push("## Owner's answers");
+    L.push("");
+    QUESTIONS.forEach(function(q){
+      var v;
+      if(q.free){ var el = $("q-"+q.id); v = el && el.value.trim(); }
+      else { var sel = document.querySelector('input[name="q-'+q.id+'"]:checked'); v = sel && sel.value; }
+      L.push("**"+q.q+"**");
+      L.push("");
+      L.push(v ? v : "_(no answer given)_");
+      L.push("");
+    });
+    L.push("## Balance defect found in the current config");
+    L.push("");
+    L.push("Profit per plot per day, from live config values:");
+    L.push("");
+    L.push("| Crop | Seed | Sells | Days | Profit/day | Verdict |");
+    L.push("| --- | --- | --- | --- | --- | --- |");
+    var best = 0;
+    CROPS.forEach(function(cr){
+      var ppd = (cr.val - cr.cost)/cr.days, dom = ppd < best;
+      if(ppd > best) best = ppd;
+      L.push("| "+cr.nm+" | "+money(cr.cost)+" | "+money(cr.val)+" | "+cr.days+" | "+money(ppd)+
+             " | "+(dom ? "**never optimal**" : "holds its rung")+" |");
+    });
+    L.push("");
+    L.push("Any crop marked *never optimal* is strictly worse per plot-day than a cheaper, faster crop");
+    L.push("the player has already unlocked. Those rungs cost money to reach and make the player poorer.");
+    L.push("");
+    L.push("## Known issues carried in from config.yml");
+    L.push("");
+    L.push("- Auto Merchant sells a slot's entire pantry every 30s whether or not the owner is online.");
+    L.push("- Contract Manager auto-delivers any contract whose basket is in storage, every 10s, unattended.");
+    L.push("- Offline farmers are bounded only by prepaid wages (offlineFarmerCatchupHours: 0 = unbounded).");
+    L.push("- Contract multipliers compound up to 7x (type x rush x streak x prestige x daily x golden);");
+    L.push("  maxMarketMultiplier and autoSellMaxPayoutPerTick both ship uncapped.");
+    L.push("- tiers.maxTier is 1, so the entire configured tier 1-10 progression ladder is inert.");
+    L.push("- Second-scale crop growth across 50+ lofts is a real performance budget on Paper. Growth must");
+    L.push("  be event-scheduled per plant, never polled across all plots.");
+    L.push("- SECURITY: a live Tebex secret and public token sit in plaintext in config.yml, alongside a");
+    L.push("  MariaDB credit-ledger connection. Rotate both before this folder is handed to anyone.");
+    L.push("");
+    return L.join("\n");
+  }
+
+  // ---------- wiring ----------
+  $("btn-start").addEventListener("click", function(){ initRound(1); show("s-game"); });
+  $("btn-next").addEventListener("click", function(){
+    initRound(M[2] ? 3 : 2); show("s-game");
+  });
+  $("btn-day").addEventListener("click", advance);
+  $("btn-brief").addEventListener("click", function(){
+    $("brief-out").textContent = buildBrief(); show("s-brief");
+  });
+  $("btn-again").addEventListener("click", function(){
+    if(timer){ clearInterval(timer); timer = null; }
+    M = {1:null,2:null,3:null}; show("s-intro");
+  });
+  $("btn-copy").addEventListener("click", function(){
+    var t = $("brief-out").textContent;
+    function done(ok){
+      $("copy-note").textContent = ok ? "Copied." : "Couldn't copy — select the text below instead.";
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){done(true);}, function(){done(false);});
+    } else { done(false); }
+  });
+})();
+</script>
