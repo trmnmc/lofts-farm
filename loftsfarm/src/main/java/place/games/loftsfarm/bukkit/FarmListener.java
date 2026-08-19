@@ -20,7 +20,19 @@ import org.bukkit.plugin.Plugin;
 import place.games.loftsfarm.domain.Crop;
 import place.games.loftsfarm.domain.SeedStack;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 public final class FarmListener implements Listener {
+
+    /**
+     * The only block types onPhysics could ever care about. BlockPhysicsEvent
+     * fires on nearly every block change in the world -- water flow, redstone,
+     * falling sand, pistons -- so this check must happen before any farm-state
+     * lookup, not after it.
+     */
+    private static final Set<Material> CROP_MATERIALS =
+            EnumSet.of(Material.WHEAT, Material.CARROTS);
 
     private final Plugin plugin;
     private final FarmService farms;
@@ -67,22 +79,39 @@ public final class FarmListener implements Listener {
      *    above has not (yet) had its own physics re-run in the same tick.
      * discardAt() is idempotent (returns false harmlessly if already
      * untracked), so the overlap between the two checks is not a problem.
+     *
+     * BOTH directions are gated on a cheap Material check before either one
+     * touches farm state. farms.at()/discardAt() build a String key
+     * (world name + three coordinates) and hit a HashMap -- trivial for one
+     * call, but BlockPhysicsEvent can fire thousands of times per second on a
+     * server with active redstone or water, so that cost must never be paid
+     * for a block we could not possibly care about. Checking
+     * "is this block a crop" or "is the block above a crop" first (plain
+     * Material reads, no hashing) throws out nearly every firing before any
+     * hashmap lookup happens; the earlier "not farmland" guard alone did not
+     * do this, since almost every block in the game is not farmland.
      */
     @EventHandler(ignoreCancelled = true)
     public void onPhysics(BlockPhysicsEvent event) {
         Block block = event.getBlock();
+        Material type = block.getType();
+        Block above = block.getRelative(0, 1, 0);
+        Material aboveType = above.getType();
 
-        farms.at(block).ifPresent(rec -> {
-            if (block.getRelative(0, -1, 0).getType() != Material.FARMLAND) {
-                farms.discardAt(block);
-            }
-        });
+        boolean selfIsCrop = CROP_MATERIALS.contains(type);
+        boolean aboveIsCrop = CROP_MATERIALS.contains(aboveType);
+        if (!selfIsCrop && !aboveIsCrop) return;
 
-        if (block.getType() != Material.FARMLAND) {
-            Block above = block.getRelative(0, 1, 0);
-            if (farms.at(above).isPresent()) {
-                farms.discardAt(above);
-            }
+        if (selfIsCrop) {
+            farms.at(block).ifPresent(rec -> {
+                if (block.getRelative(0, -1, 0).getType() != Material.FARMLAND) {
+                    farms.discardAt(block);
+                }
+            });
+        }
+
+        if (aboveIsCrop && type != Material.FARMLAND) {
+            farms.at(above).ifPresent(rec -> farms.discardAt(above));
         }
     }
 
