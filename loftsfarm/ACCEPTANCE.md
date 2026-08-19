@@ -4,9 +4,14 @@ Drop `build/LoftsFarm.jar` into a Paper 1.21.10 test server's `plugins/` folder.
 Use a superflat world. Do NOT use the live lofts-dev server — v2 is isolated by
 design and this is a throwaway.
 
+0. Before touching the server, run the domain test suite: `bash loftsfarm/run-tests.sh`
+   PASS: 145 assertions, 0 failures.
+
 1. `/farm setup` — lays 12 farmland blocks beside you.
+   PASS: 12 farmland blocks appear in a line to your right.
 2. `/farm give wheat` — one seed, 8 plantings, showing a damage bar.
 3. Right-click farmland with it. A wheat crop appears at stage 0.
+   PASS: a wheat crop block appears immediately at stage 0 (no visible grain).
 4. Watch it. Over 30 seconds it should visibly advance through stages.
    PASS: ripeness is readable from the field without opening anything.
 5. Sow the same seed 7 more times. On the 8th it should say the seed wore out
@@ -25,6 +30,7 @@ design and this is a throwaway.
 11. Let an order expire without delivering.
     PASS: balance is completely unchanged. No fee of any kind.
 12. `/farm sell` — sells all farm storage.
+    PASS: balance increases by the total value of all crops in storage; storage is emptied.
 13. Plant a crop, then `/stop` the server. Wait past its grow time. Restart.
     PASS: the crop is ripe on rejoin. Offline growth works because ripeness is
     derived from a timestamp, not from ticks.
@@ -47,6 +53,15 @@ design and this is a throwaway.
     it wore out.
 20. `/farm give carrot`, then plant a seed until it wears out.
     PASS: carrot gives exactly 7 plantings.
+21. Switch to creative mode, get a seed via `/farm give wheat`, and plant it.
+    Then get a fertiliser via `/farm give fert` and apply it to a growing crop.
+    PASS: sowing *does* consume a planting even in creative (item count drops from
+    8 to 7), confirming the asymmetry documented below. Fertilising *does not*
+    consume balance (balance unchanged), confirming it is correctly exempted.
+22. Get a carrot seed via `/farm give carrot`, then right-click the air (aim at
+    the sky, not a block).
+    PASS: the seed is consumed as food (carrot hunger bar appears, item count
+    drops). This is why carrot is a poor choice of seed material.
 
 ## Known deviations from the spec
 
