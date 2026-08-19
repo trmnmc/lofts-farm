@@ -3,7 +3,7 @@ package place.games.loftsfarm.test;
 public final class TestMain {
     public static void main(String[] args) {
         System.out.println("LoftsFarm domain tests");
-        // Later tasks append their suites here.
+        GrowthClockTest.run();
         System.exit(Check.report());
     }
 }
