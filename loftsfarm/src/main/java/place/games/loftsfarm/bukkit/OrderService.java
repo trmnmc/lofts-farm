@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import place.games.loftsfarm.domain.Crop;
 import place.games.loftsfarm.domain.FarmState;
 import place.games.loftsfarm.domain.Order;
+import place.games.loftsfarm.domain.OrderFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,12 +18,14 @@ import java.util.UUID;
  * A missed order costs the payout and nothing else. There is deliberately no
  * penalty path in this class (P5) — if a future version wants one, the design
  * has changed and this comment should be deleted on purpose.
+ *
+ * Order policy (price, quantity, fuse) lives in the domain-layer
+ * OrderFactory, not here — this class only picks a crop and holds the result.
  */
 public final class OrderService {
     private final FarmService farms;
     private final Random random = new Random();
     private final Map<UUID, Order> live = new HashMap<>();
-    private int seq = 0;
 
     public OrderService(FarmService farms) {
         this.farms = farms;
@@ -42,11 +45,7 @@ public final class OrderService {
 
     private Order generate(long now) {
         Crop crop = Crop.values()[random.nextInt(Crop.values().length)];
-        int qty = 3;
-        long unit = Math.round(crop.rawValue() * 1.15d);
-        // Fuse always clears at least one full grow cycle, or accepting is a trap.
-        long due = now + (long) (crop.growSeconds() * 1000L * 1.25d) + 45_000L;
-        return Order.single("k" + (++seq), crop, qty, unit, due);
+        return OrderFactory.create(crop, now, random);
     }
 
     public boolean deliver(UUID id, Player player) {

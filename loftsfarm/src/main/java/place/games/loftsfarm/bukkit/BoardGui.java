@@ -6,7 +6,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -23,6 +25,10 @@ import java.util.List;
  * defect was rebuilding its panels four times a second, which destroyed any
  * click that landed mid-repaint. The same failure mode applies to inventory
  * GUIs and reads to players as lag.
+ *
+ * Identified by a dedicated InventoryHolder rather than by matching the
+ * title string — structural identity instead of a string compare, and it
+ * drops the deprecated InventoryView#getTitle() call in the process.
  */
 public final class BoardGui implements Listener {
     private static final String TITLE = "\u00A78Order Board";
@@ -38,7 +44,9 @@ public final class BoardGui implements Listener {
     }
 
     public void open(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 27, TITLE);
+        BoardHolder holder = new BoardHolder();
+        Inventory inv = Bukkit.createInventory(holder, 27, TITLE);
+        holder.inventory = inv;
         render(player, inv);
         player.openInventory(inv);
     }
@@ -85,7 +93,7 @@ public final class BoardGui implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        if (!TITLE.equals(event.getView().getTitle())) return;
+        if (!(event.getInventory().getHolder() instanceof BoardHolder)) return;
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getRawSlot() != SLOT_DELIVER) return;
@@ -95,6 +103,21 @@ public final class BoardGui implements Listener {
             render(player, event.getInventory());
         } else {
             player.sendMessage("\u00A78[\u00A7c!\u00A78] \u00A77Not enough in farm storage yet.");
+        }
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (!(event.getInventory().getHolder() instanceof BoardHolder)) return;
+        event.setCancelled(true);
+    }
+
+    private static final class BoardHolder implements InventoryHolder {
+        private Inventory inventory;
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
         }
     }
 }
