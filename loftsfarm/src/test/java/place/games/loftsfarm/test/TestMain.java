@@ -5,6 +5,7 @@ public final class TestMain {
         System.out.println("LoftsFarm domain tests");
         GrowthClockTest.run();
         WalletTest.run();
+        SeedStackTest.run();
         System.exit(Check.report());
     }
 }
