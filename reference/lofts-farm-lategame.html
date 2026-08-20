@@ -1,0 +1,1857 @@
+<title>Lofts Farm</title>
+<style>
+  :root{
+    --ground:#EEF1EF; --panel:#F8FAF9; --panel-2:#E3E8E5; --line:#CBD3CE;
+    --ink:#12171A; --ink-2:#495450; --ink-3:#78847E;
+    --grain:#9A6F12; --grain-bright:#C99A2E; --grain-wash:#EFE3C6;
+    --gain:#1B7A54; --loss:#B33A22; --gain-wash:#D8EAE1; --loss-wash:#F3DCD5;
+    --focus:#1F6FB2; --on-grain:#FFFFFF;
+    --f-display:Georgia,'Iowan Old Style','Source Serif Pro',serif;
+    --f-ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --f-data:ui-monospace,'Cascadia Mono',Consolas,'SF Mono',Menlo,monospace;
+    --r:3px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0E1116; --panel:#161B21; --panel-2:#1E242B; --line:#2C343D;
+      --ink:#E7EBE9; --ink-2:#A3AEB4; --ink-3:#6F7C84;
+      --grain:#D8A93C; --grain-bright:#EFC15E; --grain-wash:#3A2F14;
+      --gain:#43BC8B; --loss:#E4664A; --gain-wash:#123024; --loss-wash:#361A14;
+      --focus:#5AA9E6; --on-grain:#12171A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1116; --panel:#161B21; --panel-2:#1E242B; --line:#2C343D;
+    --ink:#E7EBE9; --ink-2:#A3AEB4; --ink-3:#6F7C84;
+    --grain:#D8A93C; --grain-bright:#EFC15E; --grain-wash:#3A2F14;
+    --gain:#43BC8B; --loss:#E4664A; --gain-wash:#123024; --loss-wash:#361A14;
+    --focus:#5AA9E6; --on-grain:#12171A;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--f-ui);
+       font-size:15px;line-height:1.5;margin:0}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 18px 60px;display:flex;
+        flex-direction:column;gap:18px}
+  h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance}
+  h1{font-size:26px;letter-spacing:-.01em}
+  h3{font-size:16px}
+  p{margin:0}
+  .eyebrow{font-family:var(--f-data);font-size:10px;letter-spacing:.13em;
+           text-transform:uppercase;color:var(--grain);font-weight:600}
+  .tiny{font-size:12.5px;color:var(--ink-2)}
+  .num{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  .stack{display:flex;flex-direction:column}
+  .g4{gap:4px}.g8{gap:8px}.g12{gap:12px}.g16{gap:16px}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .between{justify-content:space-between}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+        padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+
+  button{font-family:var(--f-ui);font-size:13.5px;cursor:pointer;border-radius:var(--r);
+         border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+         padding:7px 13px;user-select:none;-webkit-user-select:none;
+         touch-action:manipulation;transition:background .1s ease,border-color .1s ease}
+  button:hover:not(:disabled){border-color:var(--grain);background:var(--grain-wash)}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .primary{background:var(--grain);border-color:var(--grain);color:var(--on-grain);font-weight:600}
+  .primary:hover:not(:disabled){background:var(--grain-bright);border-color:var(--grain-bright)}
+  .mini{font-size:11px;padding:3px 8px;font-family:var(--f-data)}
+  /* an unowned automation reads as a purchase, never as a free action */
+  .buy{border-style:dashed;border-color:var(--grain);color:var(--grain);background:transparent}
+  .buy:hover:not(:disabled){background:var(--grain-wash)}
+
+  header.bar{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;
+             background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:11px 16px}
+  .stat{display:flex;flex-direction:column;gap:0}
+  .stat .k{font-family:var(--f-data);font-size:9.5px;letter-spacing:.1em;
+           text-transform:uppercase;color:var(--ink-3)}
+  .stat .v{font-family:var(--f-data);font-size:18px;font-variant-numeric:tabular-nums;font-weight:600}
+
+  /* Storage rides along at the top — it is the one thing you check constantly. */
+  .storage{position:sticky;top:0;z-index:5;gap:9px;padding:11px 16px;
+           box-shadow:0 6px 14px -12px rgba(0,0,0,.55)}
+  #storage{gap:7px}
+  .stock{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;font-size:13px;
+         border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2)}
+  .stock .n{font-family:var(--f-data);font-variant-numeric:tabular-nums;font-weight:600;font-size:14px}
+  .stock .need{font-family:var(--f-data);font-size:10.5px;padding:0 5px;border-radius:999px}
+  .stock .need.short{background:var(--loss-wash);color:var(--loss)}
+  .stock .need.ok{background:var(--gain-wash);color:var(--gain)}
+  .stock .v{font-family:var(--f-data);font-size:11px;color:var(--ink-3)}
+  .stock.made{border-color:var(--grain)}
+  .stock.locked{opacity:.75;border-style:dashed}
+
+  .cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+
+  .plots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:520px){.plots{grid-template-columns:repeat(3,1fr)}}
+  .plot{aspect-ratio:1;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+        padding:4px;text-align:center;color:var(--ink);font-size:11.5px}
+  .plot.empty{border-style:dashed;color:var(--ink-3)}
+  .plot.empty:hover:not(:disabled){border-color:var(--grain);color:var(--grain)}
+  .plot.kept{border-style:solid;border-color:var(--grain);color:var(--grain)}
+  .plot.buying{border-style:dotted;border-color:var(--grain)}
+  .plot.buying .tiny:last-child{color:var(--grain);font-family:var(--f-data);font-size:10px}
+  .plot.ready{border-color:var(--gain);background:var(--gain-wash);cursor:pointer}
+  .plot.ready:hover{background:var(--gain-wash);border-color:var(--gain)}
+  .plot .ic{font-size:19px;line-height:1}
+  .plot .nm{font-weight:600;font-size:11px;line-height:1.15}
+  .prog{width:76%;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--grain);width:0;transition:width .25s linear}
+  .fert{font-size:9.5px;padding:1px 6px;font-family:var(--f-data);border-color:var(--grain);
+        color:var(--grain);background:transparent;margin-top:1px}
+  .fert:hover:not(:disabled){background:var(--grain-wash)}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .scrollx{overflow-x:auto}
+  th{font-family:var(--f-data);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+     color:var(--ink-3);text-align:right;padding:4px 6px;border-bottom:1px solid var(--line);font-weight:600}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink);
+     font-family:var(--f-data);font-variant-numeric:tabular-nums}
+  tbody tr:last-child td{border-bottom:none}
+  .tk{color:var(--ink-3);font-size:10px}
+  .up{color:var(--gain)}.dn{color:var(--loss)}
+  .chip{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;
+        font-family:var(--f-data);font-weight:600}
+  .chip.up{background:var(--gain-wash)}.chip.dn{background:var(--loss-wash)}
+  .chip.neutral{background:var(--panel-2);color:var(--ink-2)}
+  .chip.combo{background:var(--grain);color:var(--on-grain)}
+
+  .lines{display:flex;flex-direction:column;gap:2px;padding:5px 8px;border-radius:var(--r);
+         background:var(--panel);border:1px solid var(--line)}
+  .ln{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-2)}
+  .ln .tally{font-family:var(--f-data);font-variant-numeric:tabular-nums;color:var(--loss)}
+  .ln.done{color:var(--ink)}
+  .ln.done .tally{color:var(--gain)}
+  .ln.done span:first-child::after{content:" ✓";color:var(--gain)}
+
+  .hopper{border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);padding:10px 12px;
+          display:flex;flex-direction:column;gap:7px;transition:border-color .15s ease}
+  .hopper.starved{border-color:var(--loss);background:var(--loss-wash)}
+  .line{border-top:1px solid var(--line);padding-top:7px;display:flex;flex-direction:column;gap:4px}
+  .line:first-of-type{border-top:none;padding-top:0}
+  .line.idle{opacity:.55}
+  .line.held{opacity:.8}
+  .line.held .millbar i{background:var(--ink-3)}
+  .keep{display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+  .keep .num{min-width:14px;text-align:center}
+  .millbar{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+  .millbar i{display:block;height:100%;background:var(--grain);width:0;transition:width .25s linear}
+
+  .log{font-family:var(--f-data);font-size:11.5px;background:var(--panel-2);
+       border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;
+       height:112px;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:2px}
+  .log div{color:var(--ink-2)}
+  .log .hl{color:var(--grain)}
+
+  .banner{border-left:3px solid var(--grain);background:var(--grain-wash);color:var(--ink);
+          padding:10px 14px;border-radius:0 var(--r) var(--r) 0;font-size:13.5px}
+
+  dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);
+         padding:20px;max-width:460px;width:calc(100% - 32px);font-family:var(--f-ui)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+
+  hr{border:none;border-top:1px solid var(--line);margin:0}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+  <div class="row between">
+    <div class="stack g4">
+      <span class="eyebrow">Farming economy &middot; reference build</span>
+      <h1>Lofts Farm</h1>
+    </div>
+    <div class="row g8">
+      <button id="btn-help" class="mini">How it works</button>
+      <button id="btn-code" class="mini">Save code</button>
+      <button id="btn-reset" class="mini">Reset</button>
+    </div>
+  </div>
+
+  <div id="welcome"></div>
+
+  <header class="bar">
+    <div class="stat"><span class="k">Cash</span><span class="v num" id="s-cash">$0</span></div>
+    <div class="stat"><span class="k">Level</span><span class="v num" id="s-level">1</span></div>
+    <div class="stat"><span class="k">Next level</span><span class="v num" id="s-xp">0%</span></div>
+    <div class="stat"><span class="k">Mill</span><span class="v num" id="s-mill">&mdash;</span></div>
+    <div class="stat"><span class="k">Orders filled</span><span class="v num" id="s-filled">0</span></div>
+    <div class="stat"><span class="k">Net worth</span><span class="v num" id="s-net">$0</span></div>
+  </header>
+
+  <section class="card storage">
+    <div class="row between">
+      <h3>Storage</h3>
+      <span class="tiny" id="storage-note"></span>
+    </div>
+    <div class="row g8" id="storage"></div>
+  </section>
+
+  <div class="cols">
+
+    <div class="stack g16">
+      <section class="card">
+        <div class="row between">
+          <h3>The field</h3>
+          <span class="tiny" id="field-note"></span>
+        </div>
+        <div id="rack" class="stack g8"></div>
+        <div class="plots" id="plots"></div>
+        <div class="row g8">
+          <button class="primary" id="btn-harvestall">Harvest all</button>
+          <button class="primary" id="btn-replantall">Replant all</button>
+          <button id="btn-fertall">Fertilise all</button>
+        </div>
+        <div class="row g8">
+          <button id="btn-plot">Break ground on another plot</button>
+          <span class="tiny" id="plot-cost"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row between">
+          <h3>Seed merchant</h3>
+          <span class="tiny">Seeds wear out &mdash; each carries a fixed number of plantings</span>
+        </div>
+        <div class="scrollx"><table id="vendor"></table></div>
+        <div class="row g8">
+          <button id="btn-supplier">Hire a seed supplier</button>
+          <span class="tiny" id="supplier-note"></span>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack g16">
+      <section class="card">
+        <div class="row between">
+          <h3>The order board</h3>
+          <span class="tiny" id="board-note"></span>
+        </div>
+        <div class="stack g8" id="contracts"></div>
+      </section>
+
+      <section class="card">
+        <div class="row between">
+          <h3>The mill</h3>
+          <span class="tiny" id="mill-note"></span>
+        </div>
+        <div class="hopper" id="hopper"></div>
+        <div class="row g8">
+          <button id="btn-millup">Buy a mill</button>
+          <span class="tiny" id="mill-cost"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row between"><h3>Sell early</h3><span class="tiny" id="fwd-note"></span></div>
+        <div class="hopper" id="forward"></div>
+      </section>
+
+      <section class="card">
+        <div class="row between"><h3>Leaderboard</h3><span class="tiny">everyone can see this</span></div>
+        <div class="scrollx"><table id="board"></table></div>
+        <p class="tiny"><strong>Net worth</strong> is everything you own at today’s prices.
+        <strong>Building</strong> ignores price swings, so a good day on the market does not
+        flatter you and a bad one does not punish you.</p>
+      </section>
+
+      <section class="card">
+        <div class="row between"><h3>Market</h3><span class="tiny">Reprices every 3s</span></div>
+        <div class="scrollx"><table id="market"></table></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="stack g8">
+    <span class="eyebrow">Ledger</span>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<dialog id="dlg-code">
+  <div class="stack g12">
+    <h3>Save code</h3>
+    <p class="tiny" id="code-status"></p>
+    <p class="tiny">This is your whole farm as text. Copy it somewhere safe before you stop playing.
+    Paste one back in and press Load to restore that farm — it works even if browser storage is
+    wiped or the page is republished.</p>
+    <textarea id="code-box" spellcheck="false"
+      style="width:100%;min-height:130px;font-family:var(--f-data);font-size:11px;
+             padding:9px;border:1px solid var(--line);border-radius:var(--r);
+             background:var(--panel-2);color:var(--ink);resize:vertical"></textarea>
+    <div class="row g8">
+      <button class="primary" id="code-copy">Copy</button>
+      <button id="code-load">Load from box</button>
+      <button id="code-close">Close</button>
+      <span class="tiny" id="code-msg"></span>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg">
+  <div class="stack g12">
+    <h3>How Lofts Farm works</h3>
+    <div class="stack g8 tiny">
+      <p><strong>Three speeds.</strong> Crops are slow and are your supply constraint. The mill is fast
+      and can always eat more than you can grow. Fertiliser is the toll between them.</p>
+      <p><strong>Crops grow while you're away. The mill does not.</strong> Come back and the field has
+      finished without you; the mill sat idle the whole time. That asymmetry is the design.</p>
+      <p><strong>Seeds are items with durability.</strong> Buy them from the merchant, hold one, click a
+      plot to sow. Cheap seeds carry many plantings; a pitcher seed carries two.</p>
+      <p><strong>Keep each plot's crop</strong> makes every plot remember what it last grew and replant
+      that on a click — so a mixed farm stays mixed without going back to the rack each time. Turn it
+      off and every plot sows whatever is in your hand, which is faster when you want one crop in bulk.
+      A plot with no memory, or one whose seed you've run out of, falls back to the seed in hand.</p>
+      <p><strong>The order board is the game.</strong> Raw orders want crops straight from the field;
+      milled orders want finished goods and pay considerably more. Orders decide what's worth growing &mdash;
+      without them you'd just plant whichever crop pays best per second, forever.</p>
+      <p><strong>The mill will eat stock you need.</strong> It grinds raw goods two at a time, which
+      can starve a raw order of the very crop it wants. Hit <em>Stop</em> to halt everything, pause a
+      single line, or set a <em>keep</em> number — the mill never grinds a crop below that, so a line
+      can run continuously and still leave an order's worth on the shelf.</p>
+      <p><strong>Combined orders unlock at level 7.</strong> Several goods, one deadline, one payout at
+      about 40% over market. They're the reason to stop selling everything the moment you harvest it —
+      and since the mill grinds one recipe at a time, an order wanting two milled goods is a scheduling
+      problem, not just a shopping list.</p>
+      <p><strong>Nothing ever takes money off you.</strong> Miss an order and you simply don't get paid.
+      Prices move but never fall below what a crop is worth growing.</p>
+      <p><strong>Automation is bought, not given.</strong> A farmhand ($1,500) clears every ripe plot
+      at once; a seed drill ($3,000) sows every empty one; a seed supplier ($2,500) buys the seed you
+      need the moment you sow it, so you never break off planting to restock. Until you own them you
+      do each job a plot at a time — fine on four plots, less so on twelve. Once owned,
+      <strong>H</strong> and <strong>R</strong> do the bulk jobs from the keyboard.</p>
+      <p>A plot the supplier will buy for shows a dotted edge and the price, so a click never spends
+      money without telling you first. Pause the supplier any time from the merchant.</p>
+    </div>
+    <div class="row"><button class="primary" id="dlg-close">Got it</button></div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var CROPS = [
+    {id:"wheat",  nm:"Wheat",       ic:"\u{1F33E}", tk:"ADM",  seed:3,    grow:30,  val:20,   uses:8, lvl:1,
+     pn:"Flour",           ptk:"K",    pic:"\u{1F35A}"},
+    {id:"carrot", nm:"Carrot",      ic:"\u{1F955}", tk:"KR",   seed:5,    grow:45,  val:30,   uses:7, lvl:1,
+     pn:"Carrot Mash",     ptk:"CPB",  pic:"\u{1F963}"},
+    {id:"pumpkin",nm:"Pumpkin",     ic:"\u{1F383}", tk:"SFM",  seed:45,   grow:90,  val:190,  uses:5, lvl:3,
+     pn:"Pumpkin Purée", ptk:"HRL", pic:"\u{1F967}"},
+    {id:"cane",   nm:"Sugar Cane",  ic:"\u{1F36C}", tk:"KO",   seed:130,  grow:130, val:240,  uses:4, lvl:5,
+     pn:"Sugar",           ptk:"PEP",  pic:"\u{1F9C2}"},
+    {id:"wart",   nm:"Nether Wart", ic:"\u{1F344}", tk:"MRNA", seed:320,  grow:180, val:520,  uses:3, lvl:8,
+     pn:"Nether Spice",    ptk:"MKC",  pic:"\u{1F336}"},
+    {id:"pitcher",nm:"Pitcher",     ic:"\u{1FAB4}", tk:"SMG",  seed:1120, grow:260, val:1600, uses:2, lvl:12,
+     pn:"Pitcher Extract", ptk:"IFF",  pic:"\u{1F9EA}"}
+  ];
+  var C = {}; CROPS.forEach(function(c,i){ c.tier = i+1; C[c.id] = c; });
+
+  var PROD_MULT = 2.7, MILL_INPUT = 2, START_CASH = 250, START_PLOTS = 4, MAX_PLOTS = 12;
+  var COMBO_LEVEL = 7;   // combined orders unlock here
+  // Bulk actions are automation. They get bought, not given.
+  var TOOLS = {
+    harvest: {cost:1500, name:"Farmhand",  buy:"Hire a farmhand",
+              blurb:"clears every ripe plot at once"},
+    replant: {cost:3000, name:"Seed drill", buy:"Buy a seed drill",
+              blurb:"sows every empty plot at once"},
+    supplier:{cost:2500, name:"Seed supplier", buy:"Hire a seed supplier",
+              blurb:"buys the seed you need, the moment you sow it"}
+  };
+  var SAVE_KEY = "lofts-farm-v3";
+  var LEGACY_KEYS = ["lofts-farm-v2", "lofts-farm-v1"];
+  var VOL = {wheat:.05, carrot:.06, pumpkin:.09, cane:.11, wart:.15, pitcher:.20};
+
+  // ---------- late game: the ladder past Pitcher ----------
+  // The six above are hand-tuned and stay exactly as they are. Everything from
+  // here is generated at the ratios the existing ladder already implies:
+  // value x2.40 and grow time x1.54 per rung, measured Wheat -> Pitcher.
+  // It stops at seven because rung 8 would need a 1.5-hour grow time.
+  // 0.70 is Pitcher’s own seed-to-value ratio (1120/1600) and it is the price of
+  // the SEED, not of a planting — the seed carries 2, so a planting costs 0.35×
+  // value and clears 0.65×. Charging 0.70 per planting halves that and makes the
+  // whole late ladder worse than the rung below it.
+  var LATE_RATIO_VAL = 2.40, LATE_RATIO_GROW = 1.54, LATE_SEED_RATIO = 0.70;
+  var LATE = [
+    {nm:"Glowcap",       ic:"\u2728",   tk:"GLW", pn:"Glow Syrup",   ptk:"GSY", pic:"\u{1F36F}"},
+    {nm:"Emberroot",     ic:"\u{1F525}",tk:"EMB", pn:"Ember Oil",    ptk:"EOL", pic:"\u{1FAD9}"},
+    {nm:"Voidmelon",     ic:"\u{1F311}",tk:"VDM", pn:"Void Essence", ptk:"VES", pic:"\u{1F52E}"},
+    {nm:"Rimeflower",    ic:"\u2744",   tk:"RME", pn:"Rime Powder",  ptk:"RPW", pic:"\u{1F9CA}"},
+    {nm:"Sunspire Gourd",ic:"\u2600",   tk:"SUN", pn:"Sun Nectar",   ptk:"SNC", pic:"\u{1F376}"},
+    {nm:"Aetherstalk",   ic:"\u{1F32A}",tk:"AET", pn:"Aether Resin", ptk:"ARS", pic:"\u{1F48E}"},
+    {nm:"Starwheat",     ic:"\u2B50",   tk:"STR", pn:"Star Flour",   ptk:"SFL", pic:"\u{1F31F}"}
+  ];
+  LATE.forEach(function(t, i){
+    var n = i + 1;
+    var val  = Math.round(1600*Math.pow(LATE_RATIO_VAL,  n));
+    var grow = Math.round(260 *Math.pow(LATE_RATIO_GROW, n));
+    var id   = "late" + n;
+    CROPS.push({id:id, nm:t.nm, ic:t.ic, tk:t.tk,
+                seed: Math.round(val*LATE_SEED_RATIO), grow:grow, val:val, uses:2,
+                lvl: Math.round(12 + n*2.2),
+                pn:t.pn, ptk:t.ptk, pic:t.pic, gen:true});
+    VOL[id] = 0.20;   // capped: above this the price is noise, not a decision
+  });
+  CROPS.forEach(function(c, i){ c.tier = i+1; C[c.id] = c; });
+
+  // One in, one out. Unlocking a crop retires the one six rungs below it, so
+  // Glowcap replaces Wheat, Emberroot replaces Carrot, and so on down the line.
+  // The merchant therefore always stocks exactly six, and you keep the whole
+  // middle of the ladder rather than losing everything but the newest few.
+  // A retired seed still plants and still trades - it just leaves the shelf.
+  var VENDOR_WINDOW = 6;
+  function retired(c){
+    var heir = CROPS[c.tier - 1 + VENDOR_WINDOW];
+    return !!(heir && heir.lvl <= S.level);
+  }
+  function retiredBy(c){ return CROPS[c.tier - 1 + VENDOR_WINDOW] || null; }
+  function vendorList(){
+    var win = CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
+    var next = CROPS.filter(function(c){ return c.lvl > S.level; })[0];
+    if(next) win.push(next);
+    return win;
+  }
+
+  // ---------- late game: forward contracts ----------
+  // Promise more than you hold, get paid today's price on all of it with no
+  // market impact, then race to actually produce the difference.
+  var FWD_MULT = 1.5;
+  function fwdCap(id){ return Math.floor(FWD_MULT*(S.prod[id]||0)); }
+  function sellForward(id){
+    if(S.forward || !C[id]) return;
+    var q = fwdCap(id);
+    if(q < 1) return;
+    var u = prodPrice(id);
+    S.forward = {crop:id, qty:q, unit:u, due: Date.now() + C[id].grow*1000};
+    S.cash += u*q;
+    log("Promised "+q+" \u00D7 "+C[id].pn+" at "+money(u)+" each \u2014 "+
+        money(u*q)+" paid up front. Deliver before the clock.", true);
+  }
+  function settleForward(){
+    var f = S.forward;
+    if(!f || Date.now() < f.due) return;
+    var have = S.prod[f.crop]||0, give = Math.min(have, f.qty);
+    S.prod[f.crop] = have - give;
+    var short = f.qty - give;
+    if(short > 0){
+      var u = prodPrice(f.crop), pnl = (f.unit - u)*short;
+      S.cash -= u*short;
+      log("Delivered "+give+" of "+f.qty+" \u2014 bought "+short+" at "+money(u)+" to cover. "+
+          (pnl >= 0 ? "Kept "+money(pnl)+"." : "Cost you "+money(-pnl)+"."), true);
+    } else {
+      log("Forward delivered in full \u2014 "+f.qty+" \u00D7 "+C[f.crop].pn+".", true);
+    }
+    S.forward = null;
+  }
+
+  // ---------- late game: the public board ----------
+  // Net worth is measured at spot. The rate is measured at base value, so that
+  // reinvesting in plots and mills reads as progress and a lucky price swing
+  // does not read as skill.
+  var RIVALS = [{n:"Bramble",eff:1.24},{n:"Corvid",eff:0.71},{n:"Thistle",eff:1.02},
+                {n:"Vane",eff:0.46},{n:"Marrow",eff:1.55}];
+  function freshRivals(){
+    return RIVALS.map(function(r){ return {n:r.n, eff:r.eff, nw:START_CASH, rate:0}; });
+  }
+  function bookValue(){
+    var n = S.cash, k;
+    for(k in S.raw){ if(C[k]) n += (S.raw[k]||0)*C[k].val; }
+    for(k in S.prod){ if(C[k]) n += (S.prod[k]||0)*C[k].val*prodMult(); }
+    return n;
+  }
+  function sampleBook(){
+    var now = Date.now();
+    S.bookHist.push({t:now, v:bookValue()});
+    while(S.bookHist.length > 2 && S.bookHist[0].t < now - 600000) S.bookHist.shift();
+  }
+  function myRate(){
+    var o = S.bookHist[0];
+    if(!o) return 0;
+    var span = Math.max(1000, Date.now() - o.t);
+    return (bookValue() - o.v)/span*60000;
+  }
+  function advanceRivals(dt){
+    // A backwards clock (NTP correction, DST, a user changing it) makes dt
+    // negative, which would run every rival BACKWARDS into six figures of debt.
+    // Cap it at a minute so a long sleep cannot spike them either.
+    dt = Math.min(60000, Math.max(0, dt || 0));
+    var mine = Math.max(0, myRate());
+    S.rivals.forEach(function(r){
+      r.rate = r.rate*0.995 + r.eff*mine*(0.75 + Math.random()*0.5)*0.005;
+      r.nw += r.rate*(dt/60000);
+    });
+  }
+  function boardRows(){
+    var rows = S.rivals.map(function(r){ return {n:r.n, nw:r.nw, rate:r.rate, me:false}; });
+    rows.push({n:"You", nw:netWorth(), rate:myRate(), me:true});
+    rows.sort(function(a,b){ return b.nw - a.nw; });
+    return rows;
+  }
+
+  var S, lastSig = "";
+
+  function $(id){ return document.getElementById(id); }
+  function money(n){
+    var neg = n < 0, v = Math.round(Math.abs(n));
+    return (neg?"-$":"$") + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"]/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function secs(ms){
+    var s = Math.max(0, ms/1000);
+    if(s >= 60) return Math.floor(s/60)+"m "+("0"+Math.floor(s%60)).slice(-2)+"s";
+    return s.toFixed(s<10?1:0)+"s";
+  }
+  function txt(el, v){ if(el && el.textContent !== v) el.textContent = v; }
+  function wide(el, v){ if(el && el.style.width !== v) el.style.width = v; }
+  function dis(el, v){ if(el && el.disabled !== v) el.disabled = v; }
+
+  function plotCost(){ return Math.round(400*Math.pow(1.75, S.plots.length - START_PLOTS)); }
+  function hasMill(){ return S.millTier >= 1; }
+  function millCost(){ return S.millTier === 0 ? 2000 : Math.round(900*Math.pow(1.9, S.millTier-1)); }
+  function millInterval(){ return Math.max(1400, 5200 - (S.millTier-1)*640); }
+  // Two upgrades that pay off even when the hopper is empty:
+  //   more grinding lines (run several goods at once — the combo-order fix)
+  //   and richer output per raw unit (value, not throughput).
+  function millSlots(t){ t = t===undefined ? S.millTier : t; return t>=5 ? 3 : (t>=3 ? 2 : 1); }
+  function prodMult(t){ t = t===undefined ? S.millTier : t; return PROD_MULT + 0.2*Math.max(0, t-1); }
+  // Below 13 this is the tuned curve and does not move. Above it the curve has
+  // to turn exponential: crop value grows x2.40 a rung while 55*l^1.75 flattens
+  // to a 2% step by level 80, so levels would arrive faster and faster forever.
+  // 1.22 is derived from the ladder's own ratios (2.40 value / 1.54 time, ~2.2
+  // levels a rung) and holds minutes-per-level roughly flat out to level 40.
+  var LATE_XP_BASE = 1.22;
+  function xpNeeded(l){
+    if(l <= 12) return Math.round(55*Math.pow(l, 1.75));
+    return Math.round(55*Math.pow(12, 1.75)*Math.pow(LATE_XP_BASE, l - 12));
+  }
+  function fertCost(c, rem){
+    return Math.max(4, Math.round(c.val*0.26*Math.min(1, rem/(c.grow*1000))));
+  }
+  function spot(id){ return S.price[id]; }
+  function prodPrice(id){ return Math.round(S.price[id]*prodMult()); }
+  // Orders are a list of lines. A single-good order is just a one-line order.
+  function lineValue(l){ return l.kind==="prod" ? prodPrice(l.crop) : spot(l.crop); }
+  function lineHeld(l){ return l.kind==="prod" ? (S.prod[l.crop]||0) : (S.raw[l.crop]||0); }
+  function lineName(l){ var c = C[l.crop]; return l.kind==="prod" ? c.pic+" "+c.pn : c.ic+" "+c.nm; }
+  function lineLabel(l){ return l.qty+" × "+lineName(l); }
+  function canFill(k){
+    return k.lines.every(function(l){ return lineHeld(l) >= l.qty; });
+  }
+  function orderMarket(k){
+    return k.lines.reduce(function(a,l){ return a + l.qty*lineValue(l); }, 0);
+  }
+  function openOrders(){
+    return S.contracts.filter(function(k){ return k.state==="offered"||k.state==="taken"; });
+  }
+
+  // ---------- state ----------
+  function fresh(){
+    var st = {
+      cash: START_CASH, xp: 0, level: 1, millTier: 0,
+      millRecipes: ["wheat","carrot","pumpkin"], millProg: [0,0,0], millOn: [true,true,true],
+      keep: {}, replant: false, plotLast: [], tools: {},
+      plots: [], seeds: {}, raw: {}, prod: {}, price: {}, hist: {}, contracts: [], seq: 0,
+      log: [], nextContract: 0, starveTicks: 0, totalTicks: 0, filled: 0, missed: 0,
+      fertCount: 0, fertSpend: 0, held: "wheat", savedAt: Date.now(),
+      forward: null, rivals: freshRivals(), bookHist: []
+    };
+    for(var i=0;i<START_PLOTS;i++) st.plots.push(null);
+    CROPS.forEach(function(c){ st.price[c.id] = c.val; st.hist[c.id] = [c.val]; });
+    st.seeds.wheat = {n:3, uses:C.wheat.uses};
+    return st;
+  }
+  // Does this frame actually have working persistent storage? Probe once, for real.
+  var storageOK = (function(){
+    try{
+      var t = "__probe__"+Math.random();
+      localStorage.setItem(t, "1");
+      var back = localStorage.getItem(t);
+      localStorage.removeItem(t);
+      return back === "1";
+    }catch(e){ return false; }
+  })();
+
+  function save(){
+    S.savedAt = Date.now();
+    if(!storageOK) return;
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){ storageOK = false; }
+  }
+
+  // A save code the player holds. Survives cleared storage, new versions, another browser.
+  function encodeSave(){
+    S.savedAt = Date.now();
+    var json = JSON.stringify(S);
+    try{ return "LOFT1:" + btoa(unescape(encodeURIComponent(json))); }
+    catch(e){ return "LOFT0:" + json; }
+  }
+  function decodeSave(code){
+    code = (code||"").trim();
+    var json;
+    if(code.indexOf("LOFT1:") === 0){
+      try{ json = decodeURIComponent(escape(atob(code.slice(6)))); }
+      catch(e){ return null; }
+    } else if(code.indexOf("LOFT0:") === 0){
+      json = code.slice(6);
+    } else { json = code; }
+    try{
+      var st = JSON.parse(json);
+      return (st && st.plots) ? migrate(st) : null;
+    }catch(e){ return null; }
+  }
+  // Older saves stored one good per order. Bring them forward rather than dropping them.
+  function migrate(st){
+    st.price = st.price || {};
+    st.hist  = st.hist  || {};
+    st.seeds = st.seeds || {};
+    st.raw   = st.raw   || {};
+    st.prod  = st.prod  || {};
+    st.log   = st.log   || [];
+
+    st.contracts = (st.contracts || []).map(function(k){
+      if(k.lines) return k;
+      if(!k.crop || !C[k.crop]) return null;
+      return {
+        id: k.id || ("k"+(++st.seq)), combo: false,
+        lines: [{crop:k.crop, kind:k.kind || "raw", qty:k.qty || 1}],
+        pay: Math.round((k.qty||1) * (k.unit || spotOr(k.crop))),
+        due: k.due || (Date.now()+60000),
+        state: k.state === "taken" ? "taken" : "offered"
+      };
+    }).filter(Boolean);
+
+    if(typeof st.millTier !== "number") st.millTier = 0;
+    // single-recipe mills became multi-line mills
+    if(!Array.isArray(st.millRecipes)){
+      st.millRecipes = [ (st.millRecipe && C[st.millRecipe]) ? st.millRecipe : "wheat",
+                         "carrot", "pumpkin" ];
+    }
+    delete st.millRecipe;
+    while(st.millRecipes.length < 3) st.millRecipes.push("wheat");
+    st.millRecipes = st.millRecipes.map(function(r){ return C[r] ? r : "wheat"; });
+    if(!Array.isArray(st.millProg)) st.millProg = [0,0,0];
+    if(!Array.isArray(st.millOn)) st.millOn = [true,true,true];
+    while(st.millOn.length < 3) st.millOn.push(true);
+    if(!st.keep || typeof st.keep !== "object") st.keep = {};
+    if(typeof st.replant !== "boolean") st.replant = false;
+    if(!Array.isArray(st.plotLast)) st.plotLast = [];
+    if(!st.tools || typeof st.tools !== "object") st.tools = {};
+    ["seq","filled","missed","starveTicks","totalTicks","fertCount","fertSpend","xp"]
+      .forEach(function(f){ if(typeof st[f] !== "number") st[f] = 0; });
+    if(typeof st.level !== "number" || st.level < 1) st.level = 1;
+    if(typeof st.cash !== "number") st.cash = START_CASH;
+
+    CROPS.forEach(function(c){
+      if(typeof st.price[c.id] !== "number") st.price[c.id] = c.val;
+      if(!Array.isArray(st.hist[c.id]) || !st.hist[c.id].length) st.hist[c.id] = [st.price[c.id]];
+    });
+    if(!Array.isArray(st.plots) || !st.plots.length){
+      st.plots = []; for(var i=0;i<START_PLOTS;i++) st.plots.push(null);
+    }
+    return st;
+  }
+  function spotOr(id){ return C[id] ? C[id].val : 0; }
+
+  function load(){
+    if(!storageOK) return null;
+    var keys = [SAVE_KEY].concat(LEGACY_KEYS);
+    for(var i=0;i<keys.length;i++){
+      var st = null;
+      try{
+        var r = localStorage.getItem(keys[i]);
+        if(!r) continue;
+        st = JSON.parse(r);
+      }catch(e){ continue; }
+      if(!st || !st.plots) continue;
+      st = migrate(st);
+      if(keys[i] !== SAVE_KEY) st.restoredFrom = keys[i];
+      return st;
+    }
+    return null;
+  }
+  function log(t, hl){
+    S.log.unshift({t:t, hl:!!hl});
+    if(S.log.length > 60) S.log.pop();
+    logDirty = true;
+  }
+  var logDirty = true;
+
+  // ---------- market ----------
+  function repriceAll(){
+    CROPS.forEach(function(c){
+      var np = S.price[c.id]*(1+(Math.random()*2-1)*VOL[c.id]);
+      S.price[c.id] = Math.round(Math.max(c.val*0.6, Math.min(c.val*1.85, np)));
+      S.hist[c.id].push(S.price[c.id]);
+      if(S.hist[c.id].length > 30) S.hist[c.id].shift();
+    });
+    if(Math.random() < 0.22){
+      var c2 = CROPS[Math.floor(Math.random()*CROPS.length)];
+      var up = Math.random() < 0.5, mag = 0.18+Math.random()*0.17;
+      S.price[c2.id] = Math.round(Math.max(c2.val*0.6,
+        Math.min(c2.val*1.85, S.price[c2.id]*(1+(up?mag:-mag)))));
+      S.hist[c2.id][S.hist[c2.id].length-1] = S.price[c2.id];
+      log((up?"Bulk order lands — ":"Glut on the exchange — ")+c2.nm+" "+
+          (up?"+":"−")+Math.round(mag*100)+"%.", true);
+    }
+  }
+  function spark(hs){
+    if(hs.length < 2) return "";
+    var w=52,h=15,mn=Math.min.apply(null,hs),mx=Math.max.apply(null,hs),rg=mx-mn||1;
+    var pts = hs.map(function(v,i){
+      return (i/(hs.length-1)*w).toFixed(1)+","+(h-(v-mn)/rg*h).toFixed(1);
+    }).join(" ");
+    return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">'+
+      '<polyline points="'+pts+'" fill="none" stroke="'+
+      (hs[hs.length-1]>=hs[0]?"var(--gain)":"var(--loss)")+'" stroke-width="1.3"/></svg>';
+  }
+
+  // ---------- orders ----------
+  function makeLine(c){
+    var processed = hasMill() && c.tier <= S.millTier && Math.random() < 0.45;
+    return {
+      crop: c.id, kind: processed ? "prod" : "raw",
+      qty: processed ? Math.max(2, 4-Math.floor(c.tier/2)) : Math.max(3, 7-c.tier)
+    };
+  }
+
+  function offerContract(){
+    var avail = CROPS.filter(function(c){ return c.lvl <= S.level; });
+    if(!avail.length) return;
+    var combo = S.level >= COMBO_LEVEL && avail.length >= 2 && Math.random() < 0.38;
+    var lines = [], slowest = 0;
+
+    if(combo){
+      var pool = avail.slice();
+      var n = Math.min(pool.length, Math.random() < 0.35 ? 3 : 2);
+      for(var i=0;i<n;i++){
+        var pick = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+        var l = makeLine(pick);
+        l.qty = Math.max(2, Math.round(l.qty*0.7));   // lighter per line, heavier overall
+        lines.push(l);
+        slowest = Math.max(slowest, pick.grow);
+      }
+    } else {
+      var c = avail[Math.floor(Math.random()*avail.length)];
+      lines.push(makeLine(c));
+      slowest = c.grow;
+    }
+
+    var base = lines.reduce(function(a,l){ return a + l.qty*lineValue(l); }, 0);
+    S.seq++;
+    S.contracts.push({
+      id: "k"+S.seq, combo: combo, lines: lines,
+      pay: Math.round(base * (combo ? 1.4 : 1.16)),
+      due: Date.now() + slowest*1000*(combo?1.5:1.25) + (combo?85000:45000),
+      state: "offered"
+    });
+    log(combo ? "Combined order posted — "+lines.length+" goods, one deadline."
+              : "Order posted — "+lineLabel(lines[0])+".", true);
+  }
+
+  function payOut(k){
+    k.lines.forEach(function(l){
+      if(l.kind === "prod") S.prod[l.crop] -= l.qty; else S.raw[l.crop] -= l.qty;
+    });
+    S.cash += k.pay;
+    S.filled++;
+    log("Delivered "+(k.combo ? "a combined order ("+k.lines.length+" goods)" : lineLabel(k.lines[0]))+
+        " for "+money(k.pay)+".", true);
+  }
+
+  function settleContracts(){
+    var changed = false;
+    S.contracts.forEach(function(k){
+      if(k.state === "offered" && Date.now() > k.due){ k.state = "gone"; changed = true; return; }
+      if(k.state !== "taken" || Date.now() < k.due) return;
+      if(canFill(k)) payOut(k);
+      else {
+        // No penalty, ever. A missed order costs the payout, not the balance.
+        S.missed++;
+        var short = k.lines.filter(function(l){ return lineHeld(l) < l.qty; })
+                           .map(function(l){ return C[l.crop][l.kind==="prod"?"pn":"nm"]; });
+        log("Order expired — short on "+short.join(" and ")+". No payout.");
+      }
+      k.state = "done"; changed = true;
+    });
+    if(changed){
+      S.contracts = S.contracts.filter(function(k){
+        return k.state==="offered"||k.state==="taken";
+      });
+    }
+  }
+
+  // ---------- actions ----------
+  function buySeed(id){
+    var c = C[id];
+    if(!c || S.level < c.lvl || S.cash < c.seed) return;
+    S.cash -= c.seed;
+    if(!S.seeds[id]) S.seeds[id] = {n:0, uses:c.uses};
+    S.seeds[id].n++;
+    if(!S.seeds[S.held] || !S.seeds[S.held].n) S.held = id;
+    log("Bought a "+c.nm+" seed — "+c.uses+" plantings in it.");
+  }
+  function setHeld(id){ if(S.seeds[id] && S.seeds[id].n > 0) S.held = id; }
+  function haveSeed(id){ return !!(S.seeds[id] && S.seeds[id].n > 0); }
+
+  // Which crop this plot WANTS, regardless of whether a seed is on hand.
+  function intendedCrop(i){
+    if(S.replant){
+      var last = S.plotLast[i];
+      if(last && C[last] && C[last].lvl <= S.level) return last;
+    }
+    return (S.held && C[S.held] && C[S.held].lvl <= S.level) ? S.held : null;
+  }
+  // Which crop a click would sow from seeds already in hand.
+  function sowChoice(i){
+    if(S.replant){
+      var last = S.plotLast[i];
+      if(last && C[last] && haveSeed(last)) return last;
+    }
+    return haveSeed(S.held) ? S.held : null;
+  }
+  function supplierOn(){ return owns("supplier") && S.autoSeed !== false; }
+  function supplierCan(id){
+    var c = C[id];
+    return supplierOn() && c && c.lvl <= S.level && S.cash >= c.seed;
+  }
+  // What a click actually produces, counting a supplier top-up.
+  function sowPreview(i){
+    var onHand = sowChoice(i);
+    if(onHand) return onHand;
+    var want = intendedCrop(i);
+    return (want && supplierCan(want)) ? want : null;
+  }
+  // Buys one seed on demand. Returns true if a seed is now available.
+  function ensureSeed(id){
+    if(haveSeed(id)) return true;
+    if(!supplierCan(id)) return false;
+    var c = C[id];
+    S.cash -= c.seed;
+    if(!S.seeds[id]) S.seeds[id] = {n:0, uses:c.uses};
+    S.seeds[id].n++;
+    S.autoSpend = (S.autoSpend||0) + c.seed;
+    S.autoBought = (S.autoBought||0) + 1;
+    return true;
+  }
+  function toggleSupplier(){
+    if(!owns("supplier")) return;
+    S.autoSeed = S.autoSeed === false;
+    log(S.autoSeed ? "Supplier will top up seeds as you sow."
+                   : "Supplier paused — you'll sow only what you already hold.");
+  }
+  function toggleReplant(){
+    S.replant = !S.replant;
+    log(S.replant ? "Each plot will replant whatever it grew last."
+                  : "Every plot will sow the seed in your hand.");
+  }
+
+  function plant(i){
+    if(S.plots[i]) return;
+    var id = sowChoice(i);
+    if(!id){
+      var want = intendedCrop(i);
+      if(want && ensureSeed(want)) id = want;
+    }
+    var c = C[id], st = c && S.seeds[id];
+    if(!c || !st || st.n <= 0) return;
+    st.uses--;
+    if(st.uses <= 0){
+      st.n--; st.uses = c.uses;
+      log(st.n <= 0 ? "Your last "+c.nm+" seed wore out."
+                    : "A "+c.nm+" seed wore out — "+st.n+" left.");
+    }
+    S.plots[i] = {crop:c.id, readyAt: Date.now() + c.grow*1000};
+    S.plotLast[i] = c.id;
+  }
+  function harvest(i){
+    var p = S.plots[i];
+    if(!p || Date.now() < p.readyAt) return;
+    var c = C[p.crop];
+    S.raw[c.id] = (S.raw[c.id]||0) + 1;
+    S.plots[i] = null;
+    gainXp(Math.max(1, Math.round(c.val/8)));
+  }
+  function readyCount(){
+    var n = 0;
+    S.plots.forEach(function(p){ if(p && Date.now() >= p.readyAt) n++; });
+    return n;
+  }
+  function sowableCount(){
+    var n = 0;
+    S.plots.forEach(function(p,i){ if(!p && sowPreview(i)) n++; });
+    return n;
+  }
+  function owns(k){ return !!(S.tools && S.tools[k]); }
+  function buyTool(k){
+    var t = TOOLS[k];
+    if(!t || owns(k) || S.cash < t.cost) return false;
+    S.cash -= t.cost;
+    S.tools[k] = true;
+    log(t.name+" for "+money(t.cost)+" — "+t.blurb+".", true);
+    return true;
+  }
+
+  function harvestAll(){
+    if(!owns("harvest")) return 0;
+    var n = 0;
+    S.plots.forEach(function(p,i){ if(p && Date.now() >= p.readyAt){ harvest(i); n++; } });
+    if(n){ log("Harvested "+n+" plot"+(n===1?"":"s")+"."); sync(true); }
+    return n;
+  }
+  // Sows every empty plot it can. sowChoice re-evaluates each time, so running out
+  // of one seed mid-sweep falls through to the seed in hand rather than stopping.
+  function replantAll(){
+    if(!owns("replant")) return 0;
+    var n = 0, mix = {}, spentBefore = S.autoSpend||0;
+    S.plots.forEach(function(p,i){
+      if(p) return;
+      var want = sowPreview(i);
+      if(!want) return;
+      plant(i);
+      if(S.plots[i]){ n++; mix[want] = (mix[want]||0)+1; }
+    });
+    if(n){
+      var parts = Object.keys(mix).map(function(id){ return mix[id]+" "+C[id].nm; });
+      var bought = (S.autoSpend||0) - spentBefore;
+      log("Sowed "+parts.join(", ")+
+          (bought ? " — supplier spent "+money(bought)+" on seed." : "."), bought > 0);
+      sync(true);
+    }
+    return n;
+  }
+  // Core application. Returns what it cost, or 0 if it did nothing. Never logs,
+  // never spends money that isn't there.
+  function fertApply(i){
+    var p = S.plots[i];
+    if(!p || Date.now() >= p.readyAt) return 0;
+    var c = C[p.crop], rem = p.readyAt - Date.now(), cost = fertCost(c, rem);
+    if(S.cash < cost) return 0;
+    S.cash -= cost;
+    p.readyAt = Date.now() + Math.round(rem/2);
+    S.fertCount++; S.fertSpend += cost;
+    return cost;
+  }
+  function fertilise(i){
+    var p = S.plots[i];
+    if(!p || Date.now() >= p.readyAt) return;
+    var c = C[p.crop], rem = p.readyAt - Date.now();
+    var paid = fertApply(i);
+    if(paid) log("Fertilised "+c.nm+" for "+money(paid)+" — "+secs(rem/2)+" saved.", true);
+  }
+
+  function growingPlots(){
+    var out = [];
+    S.plots.forEach(function(p,i){ if(p && Date.now() < p.readyAt) out.push(i); });
+    // longest remaining first: if money runs out, the biggest wins already happened
+    return out.sort(function(a,b){ return S.plots[b].readyAt - S.plots[a].readyAt; });
+  }
+  // Dry run — what a "fertilise all" would actually do at this instant.
+  function fertPlan(){
+    var idx = growingPlots(), cash = S.cash, n = 0, spend = 0, saved = 0;
+    idx.forEach(function(i){
+      var p = S.plots[i], rem = p.readyAt - Date.now();
+      var cost = fertCost(C[p.crop], rem);
+      if(cash >= cost){ cash -= cost; spend += cost; saved += rem/2; n++; }
+    });
+    return {n:n, total:idx.length, spend:spend, saved:saved};
+  }
+  function fertiliseAll(){
+    var n = 0, spent = 0, saved = 0;
+    growingPlots().forEach(function(i){
+      var p = S.plots[i];
+      if(!p) return;
+      var rem = p.readyAt - Date.now();
+      var paid = fertApply(i);
+      if(paid){ n++; spent += paid; saved += rem/2; }
+    });
+    if(n){
+      log("Fertilised "+n+" plot"+(n===1?"":"s")+" for "+money(spent)+
+          " — "+secs(saved)+" of growing skipped.", true);
+      sync(true);
+    }
+    return n;
+  }
+  function gainXp(n){
+    S.xp += n;
+    while(S.xp >= xpNeeded(S.level)){
+      S.xp -= xpNeeded(S.level); S.level++;
+      var u = CROPS.filter(function(c){ return c.lvl === S.level; });
+      if(u.length){
+        // Name the seed leaving the shelf as well as the one arriving, or a crop
+        // the player has been growing all game quietly disappears from the shop.
+        var gone = CROPS[u[0].tier - 1 - VENDOR_WINDOW];
+        log("Level "+S.level+". "+u[0].ic+" "+u[0].nm+" seeds now stocked"+
+            (gone ? " — "+gone.ic+" "+gone.nm+" leaves the merchant. Seeds you already "+
+                    "hold still plant, and it still sells on the market." : "."), true);
+      } else {
+        log("Level "+S.level+".", true);
+      }
+      if(S.level === COMBO_LEVEL){
+        log("Combined orders unlocked — several goods, one deadline, one payout. "+
+            "You'll need to hold stock back now.", true);
+      }
+    }
+  }
+  function sellRaw(id){
+    var n = S.raw[id]||0;
+    if(!n) return;
+    var p = spot(id);
+    S.raw[id] = 0; S.cash += n*p;
+    S.price[id] = Math.max(Math.round(C[id].val*0.6), Math.round(p*(1-0.012*n)));
+    log("Sold "+n+" × "+C[id].nm+" raw for "+money(n*p)+".", true);
+  }
+  function sellProd(id){
+    var n = S.prod[id]||0;
+    if(!n) return;
+    var p = prodPrice(id);
+    S.prod[id] = 0; S.cash += n*p;
+    S.price[id] = Math.max(Math.round(C[id].val*0.6), Math.round(S.price[id]*(1-0.018*n)));
+    log("Sold "+n+" × "+C[id].pn+" for "+money(n*p)+".", true);
+  }
+  function takeContract(kid){
+    var k = S.contracts.filter(function(x){ return x.id===kid; })[0];
+    if(!k || k.state !== "offered") return;
+    k.state = "taken";
+    log("Took "+(k.combo ? "a combined order — hold everything it needs."
+                        : "the "+lineName(k.lines[0])+" order."), true);
+  }
+  function dropContract(kid){
+    var k = S.contracts.filter(function(x){ return x.id===kid; })[0];
+    if(!k || k.state !== "offered") return;
+    k.state = "gone";
+    S.contracts = S.contracts.filter(function(x){ return x.state==="offered"||x.state==="taken"; });
+  }
+  function deliverNow(kid){
+    var k = S.contracts.filter(function(x){ return x.id===kid; })[0];
+    if(!k || k.state !== "taken" || !canFill(k)) return;
+    payOut(k); k.state = "done";
+    S.contracts = S.contracts.filter(function(x){ return x.state==="offered"||x.state==="taken"; });
+  }
+  function buyPlot(){
+    if(S.plots.length >= MAX_PLOTS) return;
+    var cost = plotCost();
+    if(S.cash < cost) return;
+    S.cash -= cost; S.plots.push(null);
+    log("Broke ground on plot "+S.plots.length+" for "+money(cost)+".", true);
+  }
+  function upgradeMill(){
+    if(S.millTier >= CROPS.length) return;
+    var cost = millCost();
+    if(S.cash < cost) return;
+    var first = S.millTier === 0, before = millSlots(S.millTier);
+    S.cash -= cost; S.millTier++;
+    if(first){
+      log("Mill installed. Milled orders pay well over raw — the board will start asking.", true);
+    } else {
+      var gains = ["output now worth ×"+prodMult().toFixed(1)+" the raw",
+                   "grinds "+(millInterval()/1000).toFixed(1)+"s a batch"];
+      if(millSlots() > before) gains.unshift("A SECOND GRINDING LINE — two goods at once");
+      if(CROPS[S.millTier-1]) gains.push("handles "+CROPS[S.millTier-1].nm);
+      log("Mill is tier "+S.millTier+": "+gains.join(", ")+".", true);
+    }
+  }
+  function setRecipe(spec){
+    var bits = String(spec).split(":"), i = +bits[0], id = bits[1];
+    if(!C[id] || C[id].tier > S.millTier || i < 0 || i >= millSlots()) return;
+    S.millRecipes[i] = id; S.millProg[i] = 0;
+  }
+  function toggleLine(i){
+    i = +i;
+    if(i < 0 || i >= millSlots()) return;
+    S.millOn[i] = !S.millOn[i];
+    if(!S.millOn[i]) S.millProg[i] = 0;
+  }
+  function bumpKeep(spec){
+    var bits = String(spec).split(":"), id = bits[0], d = +bits[1];
+    if(!C[id]) return;
+    S.keep[id] = Math.max(0, Math.min(99, (S.keep[id]||0) + d));
+  }
+  function anyLineOn(){
+    for(var i=0;i<millSlots();i++){ if(S.millOn[i]) return true; }
+    return false;
+  }
+  function stopAll(){
+    var stopping = anyLineOn();
+    for(var i=0;i<millSlots();i++){
+      S.millOn[i] = !stopping;
+      if(stopping) S.millProg[i] = 0;
+    }
+    log(stopping ? "Mill stopped." : "Mill running.");
+  }
+
+  function runMill(dt){
+    if(!hasMill()) return;
+    S.totalTicks++;
+    var slots = millSlots(), running = false;
+    for(var i=0;i<slots;i++){
+      var id = S.millRecipes[i], c = C[id];
+      if(!c || c.tier > S.millTier) continue;
+      if(!S.millOn[i]){ S.millProg[i] = 0; continue; }
+      // never eat into stock the player has reserved
+      if((S.raw[id]||0) - (S.keep[id]||0) < MILL_INPUT){ S.millProg[i] = 0; continue; }
+      running = true;
+      S.millProg[i] = (S.millProg[i]||0) + dt;
+      if(S.millProg[i] >= millInterval()){
+        S.millProg[i] = 0;
+        S.raw[id] -= MILL_INPUT;
+        S.prod[id] = (S.prod[id]||0) + 1;
+      }
+    }
+    if(!running) S.starveTicks++;
+  }
+
+  function netWorth(){
+    var n = S.cash, k;
+    for(k in S.raw){ n += (S.raw[k]||0)*spot(k); }
+    for(k in S.prod){ n += (S.prod[k]||0)*prodPrice(k); }
+    return n;
+  }
+
+  function structureForward(){
+    var el = $("forward");
+    if(!el) return;
+    if(!S.forward){
+      el.innerHTML = '<div><strong>Nothing promised.</strong></div>'+
+        '<span class="tiny">Dumping a big pile drops the price as you sell it, so only the '+
+        'first few get the good number. Promising is the way round that: hand over up to '+
+        'half again what you are holding, and you are paid today\u2019s price on all of it '+
+        'right now, without moving the market.</span>'+
+        '<span class="tiny">The catch is you owe more than you have, and the clock is running. '+
+        'Grow and mill the rest in time, or buy the shortfall at whatever it costs then. '+
+        'Use the <strong>Promise</strong> button in the market once you are holding a finished good.</span>';
+      txt($("fwd-note"), "None open");
+      return;
+    }
+    var c = C[S.forward.crop];
+    el.innerHTML =
+      '<div class="row between"><span><strong>'+S.forward.qty+" \u00D7 "+c.pic+" "+c.pn+
+        '</strong></span><span class="num" data-fwdpaid="1"></span></div>'+
+      '<span class="tiny">Locked in at <strong>'+money(S.forward.unit)+
+        '</strong> each. Market now <span class="num" data-fwdnow="1"></span>.</span>'+
+      '<span class="tiny">You hold <span class="num" data-fwdhave="1"></span> \u2014 '+
+        '<span data-fwdshort="1"></span></span>'+
+      '<span class="tiny">Time left <strong class="num" data-fwdleft="1"></strong></span>';
+  }
+  function paintForward(){
+    var f = S.forward, el = $("forward");
+    if(!el) return;
+    if(!f){ txt($("fwd-note"), "None open"); return; }
+    var c = C[f.crop], have = S.prod[f.crop]||0, now = prodPrice(f.crop);
+    var short = Math.max(0, f.qty - have), left = f.due - Date.now();
+    txt(el.querySelector("[data-fwdpaid]"), money(f.unit*f.qty)+" banked");
+    txt(el.querySelector("[data-fwdnow]"),  money(now));
+    txt(el.querySelector("[data-fwdhave]"), String(have));
+    var sh = el.querySelector("[data-fwdshort]");
+    if(sh){
+      if(short){
+        var pnl = (f.unit - now)*short;
+        txt(sh, "short "+short+", which would "+
+                (pnl >= 0 ? "still make you "+money(pnl) : "cost you "+money(-pnl))+" right now");
+      } else txt(sh, "covered \u2014 you already have everything you promised");
+    }
+    txt(el.querySelector("[data-fwdleft]"), secs(left));
+    txt($("fwd-note"), short ? "short "+short : "covered");
+  }
+
+  function structureBoard(){
+    var el = $("board");
+    if(!el) return;
+    el.innerHTML = "<thead><tr><th>#</th><th>Farmer</th><th>Net worth</th><th>Building</th></tr></thead><tbody>"+
+      boardRows().map(function(r, i){
+        return '<tr'+(r.me ? ' class="me"' : "")+"><td>"+(i+1)+"</td><td>"+esc(r.n)+"</td>"+
+               '<td class="num" data-bnw="'+esc(r.n)+'"></td>'+
+               '<td class="num" data-brate="'+esc(r.n)+'"></td></tr>';
+      }).join("")+"</tbody>";
+  }
+  function paintBoard(){
+    var el = $("board");
+    if(!el) return;
+    boardRows().forEach(function(r){
+      txt(el.querySelector('[data-bnw="'+r.n+'"]'),   money(r.nw));
+      txt(el.querySelector('[data-brate="'+r.n+'"]'), money(r.rate)+"/min");
+    });
+  }
+
+  // ================= RENDERING =================
+  // structure() rebuilds DOM. It runs ONLY when the signature below changes, so a
+  // click can never be swallowed by a repaint. paint() runs every frame and only
+  // touches text, widths and disabled flags — never innerHTML.
+
+  function signature(){
+    var s = [S.level, S.millTier, S.millRecipes.slice(0, millSlots()).join(">"),
+             S.millOn.slice(0, millSlots()).join(""), S.plots.length, hasMill()?1:0];
+    s.push(S.replant ? "R" : "H", supplierOn() ? "S" : "s");
+    S.plots.forEach(function(p, i){
+      var pv = p ? "" : (sowPreview(i) || "");
+      s.push(p ? p.crop + (Date.now() >= p.readyAt ? "R" : "G")
+               : "-" + pv + (pv && !haveSeed(pv) ? "$" : ""));
+    });
+    CROPS.forEach(function(c){
+      var sd = S.seeds[c.id];
+      s.push(c.id + (sd ? sd.n : 0) + ((S.raw[c.id]||0)>0?"r":"") + ((S.prod[c.id]||0)>0?"p":""));
+    });
+    s.push(S.held);
+    s.push(S.forward ? "F"+S.forward.crop+S.forward.qty : "F-");
+    s.push(boardRows().map(function(r){ return r.n; }).join(","));
+    openOrders().forEach(function(k){ s.push(k.id + k.state); });
+    return s.join("|");
+  }
+
+  function sync(force){
+    var sig = signature();
+    if(force || sig !== lastSig){ lastSig = sig; structure(); }
+    paint();
+  }
+
+  function structure(){
+    structureStorage(); structureRack(); structurePlots(); structureVendor();
+    structureMill(); structureMarket(); structureOrders();
+    structureForward(); structureBoard();
+  }
+
+  // How much of each good the orders you've accepted are counting on.
+  function demand(){
+    var d = {};
+    S.contracts.forEach(function(k){
+      if(k.state !== "taken") return;
+      k.lines.forEach(function(l){
+        var key = l.kind+":"+l.crop;
+        d[key] = (d[key]||0) + l.qty;
+      });
+    });
+    return d;
+  }
+
+  function structureStorage(){
+    var d = demand(), chips = [];
+    CROPS.forEach(function(c){
+      if((S.raw[c.id]||0) > 0){
+        chips.push('<button class="stock" data-sr="'+c.id+'" data-chip="raw:'+c.id+'" '+
+          'title="Sell all '+esc(c.nm)+'">'+c.ic+
+          '<span class="n" data-cnt="raw:'+c.id+'"></span>'+
+          '<span class="need" data-need="raw:'+c.id+'"></span>'+
+          '<span class="v" data-val="raw:'+c.id+'"></span></button>');
+      }
+      if((S.prod[c.id]||0) > 0){
+        chips.push('<button class="stock made" data-sp="'+c.id+'" data-chip="prod:'+c.id+'" '+
+          'title="Sell all '+esc(c.pn)+'">'+c.pic+
+          '<span class="n" data-cnt="prod:'+c.id+'"></span>'+
+          '<span class="need" data-need="prod:'+c.id+'"></span>'+
+          '<span class="v" data-val="prod:'+c.id+'"></span></button>');
+      }
+    });
+    // goods an accepted order needs that you hold none of
+    Object.keys(d).forEach(function(key){
+      var bits = key.split(":"), kind = bits[0], id = bits[1];
+      var have = kind === "prod" ? (S.prod[id]||0) : (S.raw[id]||0);
+      if(have > 0) return;
+      var c = C[id];
+      chips.push('<span class="stock locked" data-chip="'+key+'">'+
+        (kind==="prod"?c.pic:c.ic)+'<span class="n" data-cnt="'+key+'"></span>'+
+        '<span class="need" data-need="'+key+'"></span></span>');
+    });
+    $("storage").innerHTML = chips.length ? chips.join("")
+      : '<p class="tiny">Nothing in storage. Harvest something.</p>';
+  }
+
+  function structureRack(){
+    var owned = CROPS.filter(function(c){ return S.seeds[c.id] && S.seeds[c.id].n > 0; });
+    if(!owned.length){
+      $("rack").innerHTML = '<p class="tiny">No seeds left. Buy some from the merchant below, '+
+        "then click a plot to sow.</p>";
+      return;
+    }
+    var h = '<div class="row between">'+
+            '<span class="tiny">'+(S.replant
+              ? "Each plot replants what it grew last"
+              : "Seed in hand — click a plot to sow it")+"</span>"+
+            '<button class="mini'+(S.replant?" primary":"")+'" data-replant="1">'+
+            (S.replant ? "Keeping each plot's crop" : "Keep each plot's crop")+
+            "</button></div><div class=\"row g8\">";
+    owned.forEach(function(c){
+      var sd = S.seeds[c.id];
+      h += '<button class="'+(S.held===c.id?"primary":"")+'" data-hold="'+c.id+
+           '" style="padding:5px 10px">'+c.ic+' <span class="num tiny">×'+sd.n+
+           '</span> <span class="num tiny">('+sd.uses+')</span></button>';
+    });
+    $("rack").innerHTML = h+"</div>";
+  }
+
+  function structurePlots(){
+    var h = "";
+    S.plots.forEach(function(p,i){
+      if(!p){
+        var id = sowPreview(i), c = C[id];
+        var kept = S.replant && S.plotLast[i] === id && id;
+        var buying = c && !haveSeed(id);
+        h += '<button class="plot empty'+(kept?" kept":"")+(buying?" buying":"")+
+             '" data-plant="'+i+'"'+(c?"":" disabled")+'>'+
+             '<span class="ic">'+(c?c.ic:"+")+'</span><span class="tiny">'+
+             (c ? "Sow "+c.nm : (S.held ? "No seeds" : "Pick a seed"))+"</span>"+
+             (buying ? '<span class="tiny">buy '+money(c.seed)+"</span>"
+                     : kept ? '<span class="tiny" style="opacity:.7">again</span>' : "")+
+             "</button>";
+        return;
+      }
+      var c2 = C[p.crop];
+      if(Date.now() >= p.readyAt){
+        h += '<button class="plot ready" data-harvest="'+i+'"><span class="ic">'+c2.ic+"</span>"+
+             '<span class="nm">'+c2.nm+'</span><span class="tiny">Harvest</span></button>';
+      } else {
+        h += '<div class="plot" data-grow="'+i+'"><span class="ic">'+c2.ic+"</span>"+
+             '<span class="nm">'+c2.nm+'</span><span class="tiny num t"></span>'+
+             '<span class="prog"><i></i></span>'+
+             '<button class="fert" data-fert="'+i+'"></button></div>';
+      }
+    });
+    $("plots").innerHTML = h;
+  }
+
+  function structureVendor(){
+    var h = "<thead><tr><th>Seed</th><th>Price</th><th>Grow</th><th>Plantings</th>"+
+            "<th>Sells at</th><th></th></tr></thead><tbody>";
+    vendorList().forEach(function(c){
+      h += "<tr><td>"+c.ic+" "+c.nm+"</td><td>"+money(c.seed)+"</td><td>"+
+           (c.grow>=60 ? (c.grow/60).toFixed(1)+"m" : c.grow+"s")+"</td><td>"+c.uses+"</td>"+
+           '<td class="px" data-px="'+c.id+'"></td><td>'+
+           (S.level < c.lvl ? '<span class="chip neutral">level '+c.lvl+"</span>"
+                            : '<button class="mini" data-buy="'+c.id+'">Buy</button>')+
+           "</td></tr>";
+    });
+    $("vendor").innerHTML = h+"</tbody>";
+  }
+
+  function structureMill(){
+    if(!hasMill()){
+      $("hopper").classList.remove("starved");
+      var w = C.wheat;
+      $("hopper").innerHTML = "<div><strong>No mill yet.</strong></div>"+
+        '<span class="tiny">You sell what you dig up. A mill grinds '+MILL_INPUT+
+        " raw into one finished good worth roughly a third more than the pair — and the board "+
+        "starts posting milled orders, which pay 22% over market.</span>"+
+        '<span class="tiny">'+w.ic+" "+w.nm+" → "+w.pic+" "+w.pn+
+        ", to start. It's the big early purchase.</span>";
+      txt($("mill-note"), "Not installed");
+      return;
+    }
+    var slots = millSlots();
+    var h = '<div class="row between"><span class="tiny">'+MILL_INPUT+" raw → 1 finished, every "+
+            (millInterval()/1000).toFixed(1)+"s per line</span>"+
+            '<button class="mini'+(anyLineOn()?"":" primary")+'" data-stopall="1">'+
+            (anyLineOn() ? "Stop" : "Start")+"</button></div>";
+
+    for(var i=0;i<slots;i++){
+      var c = C[S.millRecipes[i]], on = S.millOn[i];
+      h += '<div class="line" data-slot="'+i+'">'+
+           '<div class="row between"><span class="tiny"><strong>Line '+(i+1)+"</strong> — "+
+           c.ic+" "+c.nm+" → "+c.pic+" "+c.pn+'</span>'+
+           '<span class="tiny num" data-slotstock="'+i+'"></span></div>'+
+           '<div class="millbar"><i></i></div>'+
+           '<div class="row g8" style="margin-top:4px">'+
+           '<button class="mini'+(on?"":" primary")+'" data-lineon="'+i+'">'+
+           (on ? "Pause" : "Paused — run")+"</button>";
+      CROPS.forEach(function(x){
+        if(x.tier > S.millTier) return;
+        h += '<button class="mini'+(S.millRecipes[i]===x.id?" primary":"")+
+             '" data-recipe="'+i+":"+x.id+'">'+x.ic+"</button>";
+      });
+      h += '<span class="keep"><span class="tiny">keep</span>'+
+           '<button class="mini" data-keep="'+c.id+':-1">−</button>'+
+           '<span class="num tiny" data-keepn="'+c.id+'"></span>'+
+           '<button class="mini" data-keep="'+c.id+':1">+</button></span>';
+      h += "</div></div>";
+    }
+    h += '<div class="tiny dn" id="mill-warn" style="display:none"><strong>Idle — nothing to grind.</strong>'+
+         " Every line is empty. The mill outruns the field; that gap is what fertiliser closes.</div>";
+    $("hopper").innerHTML = h;
+    txt($("mill-note"), "Tier "+S.millTier+" · "+slots+" line"+(slots===1?"":"s")+
+        " · handles up to "+CROPS[S.millTier-1].nm);
+  }
+
+  function structureMarket(){
+    var h = "<thead><tr><th>Good</th><th>Spot</th><th>Chg</th><th>Trend</th><th>Held</th><th></th>"+
+            "</tr></thead><tbody>";
+    CROPS.forEach(function(c){
+      var nr = S.raw[c.id]||0, np = S.prod[c.id]||0;
+      if(c.lvl > S.level && !nr && !np) return;
+      h += "<tr><td>"+c.ic+" "+c.nm+' <span class="tk">'+c.tk+"</span></td>"+
+           '<td data-px="'+c.id+'"></td><td data-chg="'+c.id+'"></td><td>'+spark(S.hist[c.id])+
+           '</td><td data-have="'+c.id+'"></td><td>'+
+           (nr ? '<button class="mini" data-sr="'+c.id+'">Sell raw</button>' : "")+"</td></tr>";
+      if(np) h += "<tr><td>"+c.pic+" "+c.pn+' <span class="tk">'+c.ptk+"</span></td>"+
+           '<td data-ppx="'+c.id+'"></td><td><span class="chip up">×'+prodMult().toFixed(1)+
+           '</span></td><td></td><td data-phave="'+c.id+'"></td>'+
+           '<td><button class="mini primary" data-sp="'+c.id+'">Sell</button>'+
+           (!S.forward && fwdCap(c.id) >= 1
+              ? ' <button class="mini" data-fwd="'+c.id+'">Promise '+fwdCap(c.id)+"</button>" : "")+
+           "</td></tr>";
+    });
+    $("market").innerHTML = h+"</tbody>";
+  }
+
+  function structureOrders(){
+    var open = openOrders();
+    if(!open.length){
+      $("contracts").innerHTML = '<p class="tiny">Board is clear for a moment. New orders land constantly.</p>';
+      return;
+    }
+    open.sort(function(a,b){ return a.due-b.due; });
+    $("contracts").innerHTML = open.map(function(k){
+      var head;
+      if(k.combo){
+        head = '<div><strong>Combined order</strong> <span class="chip combo">'+
+               k.lines.length+" goods</span> "+'<span class="num">'+money(k.pay)+"</span></div>";
+      } else {
+        var l0 = k.lines[0];
+        head = "<div><strong>"+esc(lineLabel(l0))+"</strong> "+
+               (l0.kind==="prod" ? '<span class="chip up">milled</span>'
+                                 : '<span class="chip neutral">raw</span>')+
+               ' <span class="num">'+money(k.pay)+"</span></div>";
+      }
+
+      var lines = k.combo || k.state === "taken"
+        ? '<div class="lines">'+k.lines.map(function(l,i){
+            return '<div class="ln" data-ln="'+k.id+":"+i+'">'+
+                   '<span>'+esc(lineName(l))+"</span>"+
+                   '<span class="num tally"></span></div>';
+          }).join("")+"</div>"
+        : "";
+
+      var body = head + lines +
+                 '<span class="tiny" data-cmp="'+k.id+'"></span>'+
+                 '<span class="tiny num" data-clock="'+k.id+'"></span>';
+
+      if(k.state === "offered"){
+        return '<div class="hopper" data-card="'+k.id+'">'+body+
+               '<div class="row g8"><button class="primary mini" data-take="'+k.id+
+               '">Take it</button><button class="mini" data-drop="'+k.id+'">Pass</button></div></div>';
+      }
+      return '<div class="hopper" data-card="'+k.id+'">'+body+
+             '<div class="row g8"><button class="primary mini" data-deliver="'+k.id+
+             '"></button></div></div>';
+    }).join("");
+  }
+
+  // ---------- per-frame paint ----------
+  function paint(){
+    txt($("s-cash"), money(S.cash));
+    txt($("s-level"), String(S.level));
+    txt($("s-xp"), Math.round(S.xp/xpNeeded(S.level)*100)+"%");
+    txt($("s-mill"), hasMill() ? "T"+S.millTier : "—");
+    txt($("s-filled"), S.filled + (S.missed ? " / "+(S.filled+S.missed) : ""));
+    txt($("s-net"), money(netWorth()));
+    paintForward(); paintBoard();
+    txt($("board-note"), hasMill() && S.totalTicks
+      ? "Mill idle "+Math.round(S.starveTicks/S.totalTicks*100)+"% of the time"
+      : "Raw orders only until you own a mill");
+
+    // growing plots
+    var ready = 0;
+    S.plots.forEach(function(p,i){
+      if(!p) return;
+      if(Date.now() >= p.readyAt){ ready++; return; }
+      var node = $("plots").querySelector('[data-grow="'+i+'"]');
+      if(!node) return;
+      var c = C[p.crop], rem = p.readyAt - Date.now();
+      txt(node.querySelector(".t"), secs(rem));
+      wide(node.querySelector(".prog i"),
+           Math.max(0,Math.min(100,(1-rem/(c.grow*1000))*100)).toFixed(1)+"%");
+      var fb = node.querySelector(".fert"), fc = fertCost(c, rem);
+      txt(fb, "Fertilise "+money(fc));
+      dis(fb, S.cash < fc);
+    });
+    txt($("field-note"), ready ? ready+" ready to harvest"
+      : (S.plots.every(function(p){return p;}) ? "All plots sown" : "Empty plots waiting"));
+
+    var sowable = sowableCount();
+
+    var hb = $("btn-harvestall");
+    if(owns("harvest")){
+      dis(hb, ready === 0);
+      txt(hb, ready ? "Harvest all ("+ready+")" : "Harvest all");
+      hb.classList.add("primary"); hb.classList.remove("buy");
+    } else {
+      dis(hb, S.cash < TOOLS.harvest.cost);
+      txt(hb, TOOLS.harvest.buy+" · "+money(TOOLS.harvest.cost));
+      hb.classList.remove("primary"); hb.classList.add("buy");
+    }
+
+    var rb = $("btn-replantall");
+    if(owns("replant")){
+      dis(rb, sowable === 0);
+      txt(rb, sowable ? "Replant all ("+sowable+")" : "Replant all");
+      rb.classList.add("primary"); rb.classList.remove("buy");
+    } else {
+      dis(rb, S.cash < TOOLS.replant.cost);
+      txt(rb, TOOLS.replant.buy+" · "+money(TOOLS.replant.cost));
+      rb.classList.remove("primary"); rb.classList.add("buy");
+    }
+
+    var sb = $("btn-supplier");
+    if(owns("supplier")){
+      var on = supplierOn();
+      dis(sb, false);
+      txt(sb, on ? "Supplier: buying for you" : "Supplier: paused");
+      sb.classList.toggle("primary", on);
+      sb.classList.remove("buy");
+      txt($("supplier-note"), on
+        ? "Sowing a crop you're out of buys one seed automatically."
+            + (S.autoSpend ? " Spent "+money(S.autoSpend)+" so far." : "")
+        : "Click to resume. You'll only sow what you already hold.");
+    } else {
+      dis(sb, S.cash < TOOLS.supplier.cost);
+      txt(sb, TOOLS.supplier.buy+" · "+money(TOOLS.supplier.cost));
+      sb.classList.add("buy"); sb.classList.remove("primary");
+      txt($("supplier-note"), "Never break off planting to restock again.");
+    }
+
+    var fp = fertPlan();
+    dis($("btn-fertall"), fp.n === 0);
+    txt($("btn-fertall"),
+      fp.n === 0 ? "Fertilise all"
+      : fp.n < fp.total ? "Fertilise "+fp.n+" of "+fp.total+" · "+money(fp.spend)
+      : "Fertilise all ("+fp.n+") · "+money(fp.spend));
+
+    // storage strip
+    var d = demand(), totalUnits = 0, totalValue = 0, shortAny = false;
+    CROPS.forEach(function(c){
+      [["raw", S.raw[c.id]||0, spot(c.id)],
+       ["prod", S.prod[c.id]||0, prodPrice(c.id)]].forEach(function(pair){
+        var kind = pair[0], have = pair[1], unit = pair[2], key = kind+":"+c.id;
+        var want = d[key] || 0;
+        totalUnits += have; totalValue += have*unit;
+        var cn = document.querySelector('[data-cnt="'+key+'"]');
+        if(cn) txt(cn, String(have));
+        var nd = document.querySelector('[data-need="'+key+'"]');
+        if(nd){
+          if(want){
+            var ok = have >= want;
+            if(!ok) shortAny = true;
+            txt(nd, ok ? "order set" : have+" of "+want);
+            if(nd.className !== "need "+(ok?"ok":"short")) nd.className = "need "+(ok?"ok":"short");
+          } else if(nd.textContent){ txt(nd, ""); nd.className = "need"; }
+        }
+        var vl = document.querySelector('[data-val="'+key+'"]');
+        if(vl) txt(vl, money(have*unit));
+        var reserved = kind === "raw" ? (S.keep[c.id]||0) : 0;
+        var chip = document.querySelector('[data-chip="'+key+'"]');
+        if(chip && chip.tagName === "BUTTON") chip.classList.toggle("locked", reserved > 0 && have > 0);
+      });
+    });
+    txt($("storage-note"), totalUnits
+      ? totalUnits+" units · "+money(totalValue)+(shortAny ? " · short on an order" : "")
+      : "empty");
+
+    // prices
+    CROPS.forEach(function(c){
+      var hs = S.hist[c.id], p = spot(c.id);
+      Array.prototype.forEach.call(document.querySelectorAll('[data-px="'+c.id+'"]'), function(el){
+        txt(el, money(p));
+      });
+      var pel = document.querySelector('[data-ppx="'+c.id+'"]');
+      if(pel) txt(pel, money(prodPrice(c.id)));
+      var hv = document.querySelector('[data-have="'+c.id+'"]');
+      if(hv) txt(hv, String(S.raw[c.id]||0));
+      var ph = document.querySelector('[data-phave="'+c.id+'"]');
+      if(ph) txt(ph, String(S.prod[c.id]||0));
+      var chg = document.querySelector('[data-chg="'+c.id+'"]');
+      if(chg){
+        var prev = hs.length>1 ? hs[hs.length-2] : p;
+        var pct = prev ? (p-prev)/prev*100 : 0;
+        var cls = "chip " + (pct>0.5?"up":(pct<-0.5?"dn":"neutral"));
+        if(chg.firstChild && chg.firstChild.className !== cls) chg.firstChild.className = cls;
+        if(!chg.firstChild) chg.innerHTML = '<span class="'+cls+'"></span>';
+        txt(chg.firstChild, (pct>0?"+":"")+pct.toFixed(1)+"%");
+      }
+      var bb = document.querySelector('[data-buy="'+c.id+'"]');
+      if(bb) dis(bb, S.cash < c.seed);
+    });
+
+    // mill
+    if(hasMill()){
+      var slots = millSlots(), anyRunning = false;
+      for(var i=0;i<slots;i++){
+        var id = S.millRecipes[i], stock = S.raw[id]||0, res = S.keep[id]||0;
+        var on = S.millOn[i], fed = (stock - res) >= MILL_INPUT, live = on && fed;
+        if(live) anyRunning = true;
+        var row = $("hopper").querySelector('[data-slot="'+i+'"]');
+        if(!row) continue;
+        wide(row.querySelector(".millbar i"),
+             Math.min(100, (S.millProg[i]||0)/millInterval()*100).toFixed(0)+"%");
+        var state = !on ? "paused"
+                  : fed ? "grinding"
+                  : (res && stock >= MILL_INPUT ? "holding "+res+" back" : "empty");
+        txt(row.querySelector('[data-slotstock="'+i+'"]'),
+            stock+" raw · "+(S.prod[id]||0)+" made · "+state);
+        txt(row.querySelector('[data-keepn="'+id+'"]'), String(res));
+        row.classList.toggle("idle", !live);
+        row.classList.toggle("held", !on || (!fed && res > 0));
+      }
+      var warn = $("mill-warn");
+      if(warn) warn.style.display = anyRunning ? "none" : "";
+      $("hopper").classList.toggle("starved", !anyRunning);
+    }
+
+    // orders
+    openOrders().forEach(function(k){
+      var mkt = orderMarket(k), diff = k.pay - mkt;
+      var cmp = document.querySelector('[data-cmp="'+k.id+'"]');
+      if(cmp) txt(cmp, "Selling it yourself: "+money(mkt)+" · "+
+        (diff>=0 ? money(diff)+" better on contract" : money(-diff)+" better on the market"));
+
+      var left = k.due - Date.now(), urgent = left < 30000;
+      var cl = document.querySelector('[data-clock="'+k.id+'"]');
+      if(cl){ txt(cl, secs(left)+" left"); cl.classList.toggle("dn", urgent); }
+
+      k.lines.forEach(function(l,i){
+        var row = document.querySelector('[data-ln="'+k.id+":"+i+'"]');
+        if(!row) return;
+        var have = lineHeld(l), done = have >= l.qty;
+        txt(row.querySelector(".tally"), Math.min(have, l.qty)+" / "+l.qty);
+        row.classList.toggle("done", done);
+      });
+
+      var ok = canFill(k);
+      var card = document.querySelector('[data-card="'+k.id+'"]');
+      if(card) card.classList.toggle("starved", urgent && !ok && k.state==="taken");
+      if(k.state === "taken"){
+        var db = document.querySelector('[data-deliver="'+k.id+'"]');
+        if(db){
+          txt(db, ok ? "Deliver now" : (k.combo ? "Still short" : "Not enough yet"));
+          dis(db, !ok);
+        }
+      }
+    });
+
+    // shop buttons
+    var pc = plotCost(), full = S.plots.length >= MAX_PLOTS;
+    dis($("btn-plot"), full || S.cash < pc);
+    txt($("plot-cost"), full ? "Field is full at "+MAX_PLOTS+" plots." : money(pc));
+    var mc = millCost(), mmax = S.millTier >= CROPS.length;
+    dis($("btn-millup"), mmax || S.cash < mc);
+    txt($("btn-millup"), S.millTier === 0 ? "Buy a mill" : "Upgrade mill");
+    if(mmax) txt($("mill-cost"), "Fully upgraded.");
+    else if(S.millTier === 0)
+      txt($("mill-cost"), money(mc)+" — unlocks milled goods and the orders that want them");
+    else {
+      var next = [];
+      if(millSlots(S.millTier+1) > millSlots()) next.push("+1 grinding line");
+      next.push("output ×"+prodMult(S.millTier+1).toFixed(1)+" (from ×"+prodMult().toFixed(1)+")");
+      if(CROPS[S.millTier]) next.push("handles "+CROPS[S.millTier].nm);
+      txt($("mill-cost"), money(mc)+" — "+next.join(" · "));
+    }
+
+    if(logDirty){
+      $("log").innerHTML = S.log.map(function(l){
+        return '<div class="'+(l.hl?"hl":"")+'">'+esc(l.t)+"</div>";
+      }).join("");
+      logDirty = false;
+    }
+  }
+
+  // ---------- one delegated click handler for the whole page ----------
+  var HANDLERS = [
+    ["data-hold",    function(v){ setHeld(v); }],
+    ["data-replant", function(){ toggleReplant(); }],
+    ["data-plant",   function(v){ plant(+v); }],
+    ["data-harvest", function(v){ harvest(+v); }],
+    ["data-fert",    function(v){ fertilise(+v); }],
+    ["data-buy",     function(v){ buySeed(v); }],
+    ["data-recipe",  function(v){ setRecipe(v); }],
+    ["data-lineon",  function(v){ toggleLine(v); }],
+    ["data-keep",    function(v){ bumpKeep(v); }],
+    ["data-stopall", function(){ stopAll(); }],
+    ["data-sr",      function(v){ sellRaw(v); }],
+    ["data-sp",      function(v){ sellProd(v); }],
+    ["data-fwd",     function(v){ sellForward(v); }],
+    ["data-take",    function(v){ takeContract(v); }],
+    ["data-drop",    function(v){ dropContract(v); }],
+    ["data-deliver", function(v){ deliverNow(v); }]
+  ];
+  var SEL = HANDLERS.map(function(h){ return "["+h[0]+"]"; }).join(",");
+
+  document.addEventListener("click", function(ev){
+    var el = ev.target.closest ? ev.target.closest(SEL) : null;
+    if(!el || el.disabled) return;
+    for(var i=0;i<HANDLERS.length;i++){
+      var attr = HANDLERS[i][0];
+      if(el.hasAttribute(attr)){
+        HANDLERS[i][1](el.getAttribute(attr));
+        sync(true);
+        return;
+      }
+    }
+  });
+
+  // ---------- loop ----------
+  var lastRe = 0, lastTick = Date.now(), nextOrder = 0;
+  function tick(){
+    var t = Date.now(), dt = t - lastTick; lastTick = t;
+    runMill(dt);
+    if(t - lastRe >= 3000){ lastRe = t; repriceAll(); }
+    if(openOrders().length < 4 && t >= nextOrder){
+      nextOrder = t + (12 + Math.random()*14)*1000;
+      offerContract();
+    }
+    settleContracts();
+    sampleBook(); advanceRivals(dt); settleForward();
+    sync(false);
+  }
+
+  function boot(){
+    var loaded = load();
+    S = loaded || fresh();
+    if(!S.seeds[S.held] || !S.seeds[S.held].n){
+      var first = CROPS.filter(function(c){ return S.seeds[c.id] && S.seeds[c.id].n; })[0];
+      S.held = first ? first.id : "wheat";
+    }
+    S.filled = S.filled||0; S.missed = S.missed||0;
+    // Saves written before the late game exists have none of these, and none of
+    // the new crops in their price table.
+    if(S.forward === undefined) S.forward = null;
+    if(!S.rivals || !S.rivals.length) S.rivals = freshRivals();
+    if(!S.bookHist || !S.bookHist.length) S.bookHist = [];
+    CROPS.forEach(function(c){
+      if(typeof S.price[c.id] !== "number"){ S.price[c.id] = c.val; }
+      if(!S.hist[c.id] || !S.hist[c.id].length){ S.hist[c.id] = [c.val]; }
+    });
+    sampleBook();
+    S.starveTicks = S.starveTicks||0; S.totalTicks = S.totalTicks||0;
+
+    if(loaded){
+      var notes = [];
+      if(S.restoredFrom){
+        notes.push("<strong>Progress restored.</strong> Your save was written under an older "+
+          "version and has been carried forward — cash, level, field, seeds, stock and mill are intact. "+
+          "Orders in flight were converted to the new format.");
+        delete S.restoredFrom;
+        save();   // write it forward straight away so it can't be orphaned again
+      }
+      var away = Date.now() - (S.savedAt||Date.now());
+      if(away > 20000){
+        var done = S.plots.filter(function(p){ return p && Date.now() >= p.readyAt; }).length;
+        var mins = Math.round(away/60000);
+        notes.push("<strong>You were gone "+
+          (mins>=60 ? (mins/60).toFixed(1)+" hours" : Math.max(1,mins)+" minutes")+".</strong> "+
+          (done ? done+" crop"+(done===1?"":"s")+" finished while you were away. "
+                : "Nothing had finished yet. ")+
+          "The mill ran for none of it — it only turns while you're here.");
+      }
+      if(notes.length){
+        $("welcome").innerHTML = notes.map(function(n){
+          return '<div class="banner">'+n+"</div>";
+        }).join("");
+      }
+    } else {
+      log("A field, three wheat seeds and "+money(START_CASH)+". Sow something.", true);
+    }
+
+    if(!storageOK){
+      $("welcome").innerHTML = '<div class="banner"><strong>Autosave is unavailable in this frame.</strong> '+
+        "Browser storage is blocked here, so progress will not survive a reload on its own. "+
+        "Use <strong>Save code</strong> to copy your farm out before you stop, and paste it back to "+
+        "carry on.</div>" + $("welcome").innerHTML;
+    }
+
+    lastTick = Date.now();
+    sync(true);
+    setInterval(tick, 250);
+    setInterval(save, 4000);
+    window.addEventListener("beforeunload", save);
+  }
+
+  $("btn-help").addEventListener("click", function(){ $("dlg").showModal(); });
+  $("dlg-close").addEventListener("click", function(){ $("dlg").close(); });
+
+  $("btn-code").addEventListener("click", function(){
+    $("code-box").value = encodeSave();
+    txt($("code-msg"), "");
+    txt($("code-status"), storageOK
+      ? "Autosave is working in this browser — but it does not survive the page being republished. "+
+        "Keep a code anyway."
+      : "Autosave is NOT available in this frame. A save code is the only way to keep this farm.");
+    $("dlg-code").showModal();
+    $("code-box").select();
+  });
+  $("code-copy").addEventListener("click", function(){
+    var v = $("code-box").value;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(v).then(
+        function(){ txt($("code-msg"), "Copied."); },
+        function(){ txt($("code-msg"), "Couldn't copy — select the text and copy it."); });
+    } else {
+      $("code-box").select();
+      txt($("code-msg"), "Select the text and copy it.");
+    }
+  });
+  $("code-load").addEventListener("click", function(){
+    var st = decodeSave($("code-box").value);
+    if(!st){ txt($("code-msg"), "That doesn't look like a save code."); return; }
+    S = st; S.restoredFrom = null;
+    save();
+    $("welcome").innerHTML = '<div class="banner"><strong>Farm restored from a save code.</strong> '+
+      "Level "+S.level+", "+money(S.cash)+", "+S.plots.length+" plots.</div>";
+    log("Restored from a save code.", true);
+    lastSig = ""; sync(true);
+    $("dlg-code").close();
+  });
+  $("code-close").addEventListener("click", function(){ $("dlg-code").close(); });
+  $("btn-plot").addEventListener("click", function(){ buyPlot(); sync(true); });
+  $("btn-millup").addEventListener("click", function(){ upgradeMill(); sync(true); });
+  $("btn-reset").addEventListener("click", function(){
+    if(!window.confirm("Wipe your farm and start over? This can't be undone.")) return;
+    try{
+      localStorage.removeItem(SAVE_KEY);
+      LEGACY_KEYS.forEach(function(k){ localStorage.removeItem(k); });
+    }catch(e){}
+    S = fresh(); $("welcome").innerHTML = "";
+    log("Fresh start.", true); sync(true);
+  });
+  $("btn-harvestall").addEventListener("click", function(){
+    if(owns("harvest")) harvestAll(); else if(buyTool("harvest")) sync(true);
+  });
+  $("btn-replantall").addEventListener("click", function(){
+    if(owns("replant")) replantAll(); else if(buyTool("replant")) sync(true);
+  });
+  $("btn-fertall").addEventListener("click", function(){ fertiliseAll(); });
+  $("btn-supplier").addEventListener("click", function(){
+    if(owns("supplier")){ toggleSupplier(); sync(true); }
+    else if(buyTool("supplier")){ S.autoSeed = true; sync(true); }
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.metaKey || e.ctrlKey || e.altKey) return;
+    if(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    var k = e.key.toLowerCase();
+    if(k === "h") harvestAll();
+    if(k === "r") replantAll();
+  });
+
+  boot();
+
+  // Test affordance only: ?debug=1 exposes the internals so the design can be
+  // driven and measured from outside. Absent without the query flag.
+  if(location.search.indexOf("debug=1") >= 0){
+    window.__lofts = {
+      get S(){ return S; }, set S(v){ S = v; },
+      CROPS:CROPS, C:C, VOL:VOL, fresh:fresh, tick:tick, sync:sync, save:save,
+      xpNeeded:xpNeeded, gainXp:gainXp, plant:plant, harvest:harvest, buySeed:buySeed,
+      sellRaw:sellRaw, sellProd:sellProd, sellForward:sellForward, settleForward:settleForward,
+      fwdCap:fwdCap, vendorList:vendorList, boardRows:boardRows, myRate:myRate,
+      bookValue:bookValue, netWorth:netWorth, fertCost:fertCost, millCost:millCost,
+      prodMult:prodMult, prodPrice:prodPrice, spot:spot, repriceAll:repriceAll
+    };
+  }
+})();
+</script>

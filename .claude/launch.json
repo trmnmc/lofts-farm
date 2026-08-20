@@ -2,14 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "lofts-farm",
+      "name": "late-game-sandbox",
       "runtimeExecutable": "node",
       "runtimeArgs": [
-        "C:/Users/truman/AppData/Local/Temp/claude/C--Users-truman-OneDrive-Documents-Minecraft-Server/3f7fffd3-72f5-4b5e-b5b0-24929097781e/scratchpad/serve.js",
-        "C:/Users/truman/AppData/Local/Temp/claude/C--Users-truman-OneDrive-Documents-Minecraft-Server/3f7fffd3-72f5-4b5e-b5b0-24929097781e/scratchpad",
-        "8770"
+        "C:/Users/truman/AppData/Local/Temp/claude/C--Users-truman-OneDrive-Documents-Minecraft-Server--claude-worktrees-lofts-farm-late-game-c25441/15d424a5-e1f9-47dc-a815-4c4e53f931f3/scratchpad/serve.js",
+        "C:/Users/truman/OneDrive/Documents/Minecraft-Server/.claude/worktrees/lofts-farm-late-game-c25441/reference",
+        "8771"
       ],
-      "port": 8770
+      "port": 8771
     }
   ]
 }
