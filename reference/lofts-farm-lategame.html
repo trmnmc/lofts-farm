@@ -176,11 +176,12 @@
                color:var(--ink);background:none;border:0;text-align:left;padding:2px 0;cursor:pointer}
   .modbar .ttl:hover{color:var(--ink-2)}
   .modbar .note{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .grip{cursor:grab;touch-action:none;padding:5px 7px;border-radius:6px;line-height:1;
-        color:var(--ink-2);border:1px solid transparent;background:none;font-size:13px}
+  /* Grip and buttons share one box so the header row reads as a set. */
+  .grip,.modbtn{width:34px;height:30px;min-width:34px;padding:0;font-size:12px;line-height:1;
+                display:inline-flex;align-items:center;justify-content:center;border-radius:6px}
+  .grip{cursor:grab;touch-action:none;color:var(--ink-2);border:1px solid transparent;background:none;font-size:14px}
   .grip:hover{background:var(--panel-2);border-color:var(--line)}
   .grip:active{cursor:grabbing}
-  .modbtn{padding:3px 8px;font-size:12px;line-height:1.4;min-width:28px}
   .card.collapsed > *:not(.modbar){display:none}
   .card.dragging{opacity:.45}
   .card.dragging .modbar{cursor:grabbing}
@@ -202,8 +203,8 @@
     .modbar .ttl{flex:1 1 100%;order:-2;font-size:15px}
     .modbar .note{flex:1 1 100%;order:-1;white-space:normal}
     .modbar .grip,.modbar .modbtn{order:1}
-    .modbar .grip{margin-right:auto;padding:8px 11px;font-size:16px;min-height:40px}
-    .modbtn{min-width:44px;min-height:40px;padding:7px 11px;font-size:13px}
+    .modbar .grip{margin-right:auto;font-size:16px}
+    .modbar .grip,.modbar .modbtn{width:44px;height:40px;min-width:44px}
     .modbar .ttl{min-height:34px}
   }
 </style>
@@ -453,6 +454,13 @@
   function vendorList(){
     return CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
   }
+  // The shelf, plus exactly one locked seed so there is always a visible next
+  // rung to work toward. Never the whole ladder.
+  function vendorRows(){
+    var rows = vendorList();
+    var next = CROPS.filter(function(c){ return c.lvl > S.level; })[0];
+    return next ? rows.concat([next]) : rows;
+  }
 
   var S, lastSig = "";
 
@@ -658,8 +666,14 @@
       S.price[c2.id] = Math.round(Math.max(c2.val*0.6,
         Math.min(c2.val*1.85, S.price[c2.id]*(1+(up?mag:-mag)))));
       S.hist[c2.id][S.hist[c2.id].length-1] = S.price[c2.id];
-      log((up?"Bulk order lands — ":"Glut on the exchange — ")+c2.nm+" "+
-          (up?"+":"−")+Math.round(mag*100)+"%.", true);
+      // Only announce a shock in a crop the player can actually see. Naming a
+      // locked one spoils the discovery, and naming a retired one drags a crop
+      // back into view that the rotation just quietly removed. The price still
+      // moves either way - it is the ledger line that is withheld.
+      if(c2.lvl <= S.level && !retired(c2)){
+        log((up?"Bulk order lands — ":"Glut on the exchange — ")+c2.nm+" "+
+            (up?"+":"−")+Math.round(mag*100)+"%.", true);
+      }
     }
   }
   function spark(hs){
@@ -1206,7 +1220,7 @@
   function structureVendor(){
     var h = "<thead><tr><th>Seed</th><th>Price</th><th>Grow</th><th>Plantings</th>"+
             "<th>Sells at</th><th></th></tr></thead><tbody>";
-    vendorList().forEach(function(c){
+    vendorRows().forEach(function(c){
       h += "<tr><td>"+c.ic+" "+c.nm+"</td><td>"+money(c.seed)+"</td><td>"+
            (c.grow>=60 ? (c.grow/60).toFixed(1)+"m" : c.grow+"s")+"</td><td>"+c.uses+"</td>"+
            '<td class="px" data-px="'+c.id+'"></td><td>'+
@@ -1270,6 +1284,10 @@
     CROPS.forEach(function(c){
       var nr = S.raw[c.id]||0, np = S.prod[c.id]||0;
       if(c.lvl > S.level && !nr && !np) return;
+      // A retired crop keeps its market row only while stock remains, so the
+      // leftovers can be sold off. Once the last unit is gone the row goes with
+      // it rather than sitting there dead for the rest of the run.
+      if(retired(c) && !nr && !np) return;
       h += "<tr><td>"+c.ic+" "+c.nm+' <span class="tk">'+c.tk+"</span></td>"+
            '<td data-px="'+c.id+'"></td><td data-chg="'+c.id+'"></td><td>'+spark(S.hist[c.id])+
            '</td><td data-have="'+c.id+'"></td><td>'+
@@ -1580,7 +1598,14 @@
   function tick(){
     var t = Date.now(), dt = t - lastTick; lastTick = t;
     runMill(dt);
-    if(t - lastRe >= 3000){ lastRe = t; repriceAll(); }
+    // Catch up rather than repricing once per tick. tick() is driven by a real
+    // 250ms interval, so with the dev clock running the world would otherwise
+    // accelerate while the market stayed at four reprices a real second. The
+    // same skip happens in an ordinary backgrounded tab. Bounded so a long
+    // catch-up cannot lock the page.
+    var reps = 0;
+    while(t - lastRe >= 3000 && reps++ < 40){ lastRe += 3000; repriceAll(); }
+    if(t - lastRe >= 3000) lastRe = t;
     if(openOrders().length < 4 && t >= nextOrder){
       nextOrder = t + (12 + Math.random()*14)*1000;
       offerContract();
@@ -1868,13 +1893,27 @@
     x.setTransform(dpr,0,0,dpr,0,0);
     x.clearRect(0,0,w,h);
 
+    // Four lines at most, the four newest crops you can still buy. More than
+    // that and the plot is unreadable regardless of how it is drawn.
+    var CHART_MAX = 4;
     var set = vendorList().filter(function(c){ return S.hist[c.id] && S.hist[c.id].length > 1; });
-    // Wide enough for the word "ceiling" at 10px, or the labels clip off-canvas.
-    var pad = 48, top = 14, bot = h - 16;
+    if(set.length > CHART_MAX) set = set.slice(-CHART_MAX);
+
+    // The legend gets its own reserved band under the plot, measured rather than
+    // guessed, so a line can never be drawn through a label.
+    x.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+    var gap = 12, lx = 0, rows = 1;
+    var widths = set.map(function(c){ return x.measureText(c.ic+" "+c.nm).width; });
+    var pad = 48;
+    widths.forEach(function(wd){
+      if(lx && lx + wd > w - pad - 6){ rows++; lx = 0; }
+      lx += wd + gap;
+    });
+    var legendH = set.length ? rows*13 + 4 : 0;
+    var top = 10, bot = h - 8 - legendH;
     function yOf(rel){ return bot - (rel - 0.55)/(1.9 - 0.55)*(bot - top); }
 
     var mute = getComputedStyle(document.body).getPropertyValue("--ink-2").trim() || "#8a8a8a";
-    x.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
     [[0.6,"floor"],[1,"normal"],[1.85,"ceiling"]].forEach(function(g){
       var y = yOf(g[0]);
       x.strokeStyle = mute; x.globalAlpha = .3; x.setLineDash([3,4]);
@@ -1900,12 +1939,13 @@
     });
 
     x.textAlign = "left";
-    var perRow = Math.max(1, Math.floor((w - pad - 8)/104));
+    var cx = pad, cy = bot + 14;
     set.forEach(function(c, i){
+      if(cx > pad && cx + widths[i] > w - 6){ cx = pad; cy += 13; }
       x.fillStyle = CHART_INK[i % CHART_INK.length];
-      x.fillText(c.ic + " " + c.nm,
-                 pad + 4 + (i % perRow)*104,
-                 top - 3 + Math.floor(i/perRow)*12);
+      x.fillRect(cx, cy - 7, 7, 2.5);
+      x.fillText(c.ic + " " + c.nm, cx + 11, cy);
+      cx += widths[i] + gap + 11;
     });
 
     var hot = set.filter(function(c){ return S.price[c.id]/c.val > 1.15; }).length;
