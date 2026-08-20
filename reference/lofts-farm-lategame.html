@@ -409,16 +409,20 @@
   // middle of the ladder rather than losing everything but the newest few.
   // A retired seed still plants and still trades - it just leaves the shelf.
   var VENDOR_WINDOW = 6;
-  function retired(c){
-    var heir = CROPS[c.tier - 1 + VENDOR_WINDOW];
-    return !!(heir && heir.lvl <= S.level);
+  // Retirement is triggered by BUYING the new seed, not by reaching the level
+  // that unlocks it. Unlocking is something that happens to you; buying is a
+  // choice, so the player decides when to give a crop up.
+  function boughtEver(id){ return !!(S.bought && S.bought[id]); }
+  function heirOf(c){ return CROPS[c.tier - 1 + VENDOR_WINDOW] || null; }
+  function retiredBy(c){
+    var h = heirOf(c);
+    return (h && boughtEver(h.id)) ? h : null;
   }
-  function retiredBy(c){ return CROPS[c.tier - 1 + VENDOR_WINDOW] || null; }
+  function retired(c){ return !!retiredBy(c); }
+  // The shelf carries what you have unlocked and not yet replaced. Nothing else -
+  // no locked preview rows.
   function vendorList(){
-    var win = CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
-    var next = CROPS.filter(function(c){ return c.lvl > S.level; })[0];
-    if(next) win.push(next);
-    return win;
+    return CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
   }
 
   // ---------- late game: forward contracts ----------
@@ -566,7 +570,7 @@
       plots: [], seeds: {}, raw: {}, prod: {}, price: {}, hist: {}, contracts: [], seq: 0,
       log: [], nextContract: 0, starveTicks: 0, totalTicks: 0, filled: 0, missed: 0,
       fertCount: 0, fertSpend: 0, held: "wheat", savedAt: Date.now(),
-      forward: null, rivals: freshRivals(), bookHist: []
+      forward: null, rivals: freshRivals(), bookHist: [], bought: {wheat:true}
     };
     for(var i=0;i<START_PLOTS;i++) st.plots.push(null);
     CROPS.forEach(function(c){ st.price[c.id] = c.val; st.hist[c.id] = [c.val]; });
@@ -800,7 +804,18 @@
     if(!S.seeds[id]) S.seeds[id] = {n:0, uses:c.uses};
     S.seeds[id].n++;
     if(!S.seeds[S.held] || !S.seeds[S.held].n) S.held = id;
+    var firstBuy = !boughtEver(id);
+    if(!S.bought) S.bought = {};
+    S.bought[id] = true;
     log("Bought a "+c.nm+" seed — "+c.uses+" plantings in it.");
+    if(firstBuy){
+      // Buying the heir is what pushes its ancestor off the shelf.
+      var gone = CROPS[c.tier - 1 - VENDOR_WINDOW];
+      if(gone){
+        log(gone.ic+" "+gone.nm+" leaves the merchant — "+c.ic+" "+c.nm+" takes its slot. "+
+            "Seeds you already hold still plant, and it still sells on the market.", true);
+      }
+    }
   }
   function setHeld(id){ if(S.seeds[id] && S.seeds[id].n > 0) S.held = id; }
   function haveSeed(id){ return !!(S.seeds[id] && S.seeds[id].n > 0); }
@@ -989,12 +1004,9 @@
       S.xp -= xpNeeded(S.level); S.level++;
       var u = CROPS.filter(function(c){ return c.lvl === S.level; });
       if(u.length){
-        // Name the seed leaving the shelf as well as the one arriving, or a crop
-        // the player has been growing all game quietly disappears from the shop.
-        var gone = CROPS[u[0].tier - 1 - VENDOR_WINDOW];
+        var doomed = CROPS[u[0].tier - 1 - VENDOR_WINDOW];
         log("Level "+S.level+". "+u[0].ic+" "+u[0].nm+" seeds now stocked"+
-            (gone ? " — "+gone.ic+" "+gone.nm+" leaves the merchant. Seeds you already "+
-                    "hold still plant, and it still sells on the market." : "."), true);
+            (doomed ? " — buying one retires "+doomed.ic+" "+doomed.nm+"." : "."), true);
       } else {
         log("Level "+S.level+".", true);
       }
@@ -1721,6 +1733,13 @@
     // Saves written before the late game exists have none of these, and none of
     // the new crops in their price table.
     if(S.forward === undefined) S.forward = null;
+    if(!S.bought){
+      // Older saves never tracked purchases. Infer from what is already held or
+      // planted, so nothing retires retroactively for a crop never bought.
+      S.bought = {};
+      CROPS.forEach(function(c){ if(S.seeds[c.id] && S.seeds[c.id].n) S.bought[c.id] = true; });
+      S.plots.forEach(function(p){ if(p) S.bought[p.crop] = true; });
+    }
     if(!S.rivals || !S.rivals.length) S.rivals = freshRivals();
     if(!S.bookHist || !S.bookHist.length) S.bookHist = [];
     CROPS.forEach(function(c){
