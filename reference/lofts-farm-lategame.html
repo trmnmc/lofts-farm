@@ -1,3 +1,4 @@
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lofts Farm</title>
 <style>
   :root{
@@ -161,6 +162,50 @@
 
   hr{border:none;border-top:1px solid var(--line);margin:0}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* Modules flow in columns rather than sitting in two fixed stacks, so DOM
+     order is the visual order and reordering is just moving an element.
+     break-inside keeps a card whole instead of splitting it across a column. */
+  .cols{display:block;column-count:2;column-gap:16px}
+  @media(max-width:900px){.cols{column-count:1}}
+  .cols > .card{break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 16px}
+
+  .modbar{display:flex;align-items:center;gap:6px;margin:0 0 10px;user-select:none;
+          -webkit-user-select:none;flex-wrap:wrap}
+  .modbar .ttl{flex:1 1 auto;min-width:0;font:inherit;font-size:15px;font-weight:650;
+               color:var(--ink);background:none;border:0;text-align:left;padding:2px 0;cursor:pointer}
+  .modbar .ttl:hover{color:var(--ink-2)}
+  .modbar .note{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .grip{cursor:grab;touch-action:none;padding:5px 7px;border-radius:6px;line-height:1;
+        color:var(--ink-2);border:1px solid transparent;background:none;font-size:13px}
+  .grip:hover{background:var(--panel-2);border-color:var(--line)}
+  .grip:active{cursor:grabbing}
+  .modbtn{padding:3px 8px;font-size:12px;line-height:1.4;min-width:28px}
+  .card.collapsed > *:not(.modbar){display:none}
+  .card.dragging{opacity:.45}
+  .card.dragging .modbar{cursor:grabbing}
+
+  canvas.chart{display:block;width:100%;height:190px;border:1px solid var(--line);
+               border-radius:var(--r);background:var(--panel-2)}
+
+  .devbar{position:sticky;bottom:8px;z-index:40;display:flex;gap:8px;align-items:center;
+          flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+          border-radius:var(--r);padding:9px 12px;margin-top:14px;
+          box-shadow:0 6px 24px rgba(0,0,0,.18)}
+  .devbar .on{background:var(--ink);color:var(--panel);border-color:var(--ink);font-weight:700}
+
+  /* On a phone the header stacks into three bands: title, note, then one row
+     of controls with the grip on the left and the buttons on the right. Letting
+     them share a line pushes the collapse button onto a line of its own. */
+  @media(max-width:560px){
+    .modbar{gap:6px}
+    .modbar .ttl{flex:1 1 100%;order:-2;font-size:15px}
+    .modbar .note{flex:1 1 100%;order:-1;white-space:normal}
+    .modbar .grip,.modbar .modbtn{order:1}
+    .modbar .grip{margin-right:auto;padding:8px 11px;font-size:16px;min-height:40px}
+    .modbtn{min-width:44px;min-height:40px;padding:7px 11px;font-size:13px}
+    .modbar .ttl{min-height:34px}
+  }
 </style>
 
 <div class="wrap">
@@ -188,7 +233,7 @@
     <div class="stat"><span class="k">Net worth</span><span class="v num" id="s-net">$0</span></div>
   </header>
 
-  <section class="card storage">
+  <section class="card storage" data-mod="storage" data-fixed="1">
     <div class="row between">
       <h3>Storage</h3>
       <span class="tiny" id="storage-note"></span>
@@ -198,8 +243,7 @@
 
   <div class="cols">
 
-    <div class="stack g16">
-      <section class="card">
+      <section class="card" data-mod="field">
         <div class="row between">
           <h3>The field</h3>
           <span class="tiny" id="field-note"></span>
@@ -217,7 +261,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" data-mod="merchant">
         <div class="row between">
           <h3>Seed merchant</h3>
           <span class="tiny">Seeds wear out &mdash; each carries a fixed number of plantings</span>
@@ -228,10 +272,8 @@
           <span class="tiny" id="supplier-note"></span>
         </div>
       </section>
-    </div>
 
-    <div class="stack g16">
-      <section class="card">
+      <section class="card" data-mod="board">
         <div class="row between">
           <h3>The order board</h3>
           <span class="tiny" id="board-note"></span>
@@ -239,7 +281,7 @@
         <div class="stack g8" id="contracts"></div>
       </section>
 
-      <section class="card">
+      <section class="card" data-mod="mill">
         <div class="row between">
           <h3>The mill</h3>
           <span class="tiny" id="mill-note"></span>
@@ -251,12 +293,18 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" data-mod="market">
         <div class="row between"><h3>Market</h3><span class="tiny">Reprices every 3s</span></div>
         <div class="scrollx"><table id="market"></table></div>
       </section>
-    </div>
+
+      <section class="card" data-mod="prices">
+        <div class="row between"><h3>Price history</h3><span class="tiny" id="chart-note"></span></div>
+        <canvas class="chart" id="chart"></canvas>
+      </section>
   </div>
+
+  <div id="devbar-host"></div>
 
   <div class="stack g8">
     <span class="eyebrow">Ledger</span>
@@ -1279,6 +1327,7 @@
 
   // ---------- per-frame paint ----------
   function paint(){
+    drawChart();
     txt($("s-cash"), money(S.cash));
     txt($("s-level"), String(S.level));
     txt($("s-xp"), Math.round(S.xp/xpNeeded(S.level)*100)+"%");
@@ -1599,8 +1648,9 @@
     lastTick = Date.now();
     sync(true);
     setInterval(tick, 250);
-    setInterval(save, 4000);
-    window.addEventListener("beforeunload", save);
+    saveTimer = setInterval(save, 4000);
+    window.addEventListener("beforeunload", function(){ if(!devFast) save(); });
+    uiBoot();
   }
 
   $("btn-help").addEventListener("click", function(){ $("dlg").showModal(); });
@@ -1668,6 +1718,252 @@
     if(k === "h") harvestAll();
     if(k === "r") replantAll();
   });
+
+  // ================= MODULE CHROME =================
+  // Collapse and reorder. Touches only <section> elements and their first child.
+  // structure() rewrites inner containers by id, so none of this is ever undone
+  // by a repaint, and none of it sits between a click and a game button.
+  var UI_KEY = "lofts-farm-ui";
+  var ui = {collapsed:{}, order:[]};
+
+  function uiLoadState(){
+    try{ var r = localStorage.getItem(UI_KEY); if(r) ui = JSON.parse(r) || ui; }catch(e){}
+    if(!ui || typeof ui !== "object") ui = {};
+    ui.collapsed = ui.collapsed || {};
+    ui.order = ui.order || [];
+  }
+  function uiSaveState(){
+    try{ localStorage.setItem(UI_KEY, JSON.stringify(ui)); }catch(e){}
+  }
+  function colsHost(){ return document.querySelector(".cols"); }
+  function movable(){
+    return [].slice.call(document.querySelectorAll(".cols > .card[data-mod]"));
+  }
+  function everyMod(){
+    return [].slice.call(document.querySelectorAll(".card[data-mod]"));
+  }
+
+  function setCollapsed(el, v){
+    el.classList.toggle("collapsed", !!v);
+    ui.collapsed[el.getAttribute("data-mod")] = !!v;
+    uiSaveState();
+    var f = el.querySelector(".modbar .fold");
+    if(f){
+      f.textContent = v ? "+" : "\u2212";
+      f.title = v ? "Expand" : "Collapse";
+    }
+    var t = el.querySelector(".modbar .ttl");
+    if(t) t.setAttribute("aria-expanded", v ? "false" : "true");
+  }
+  function captureOrder(){
+    ui.order = movable().map(function(el){ return el.getAttribute("data-mod"); });
+    uiSaveState();
+  }
+  function applyOrder(){
+    var host = colsHost();
+    if(!host || !ui.order.length) return;
+    ui.order.forEach(function(id){
+      var el = host.querySelector('.card[data-mod="'+id+'"]');
+      if(el) host.appendChild(el);   // re-appending in saved order sorts them
+    });
+  }
+  function moveMod(el, dir){
+    var host = el.parentNode, list = movable(), i = list.indexOf(el), j = i + dir;
+    if(i < 0 || j < 0 || j >= list.length) return;
+    if(dir < 0) host.insertBefore(el, list[j]);
+    else host.insertBefore(list[j], el);
+    captureOrder();
+  }
+
+  function buildChrome(){
+    everyMod().forEach(function(el){
+      if(el.querySelector(":scope > .modbar")) return;
+      var fixed = el.hasAttribute("data-fixed");
+      var h3 = el.querySelector("h3");
+      var name = h3 ? h3.textContent : el.getAttribute("data-mod");
+      var head = h3 ? h3.parentNode : null;
+
+      var bar = document.createElement("div");
+      bar.className = "modbar";
+      bar.innerHTML =
+        (fixed ? "" : '<button class="grip" title="Drag to reorder" aria-label="Drag to reorder">\u2237</button>')+
+        '<button class="ttl" aria-expanded="true">'+esc(name)+"</button>"+
+        (fixed ? "" : '<button class="modbtn up" title="Move up" aria-label="Move up">\u25B2</button>'+
+                      '<button class="modbtn down" title="Move down" aria-label="Move down">\u25BC</button>')+
+        '<button class="modbtn fold" title="Collapse" aria-label="Collapse">\u2212</button>';
+
+      // The heading moves into the bar. Any note beside it moves too, keeping
+      // ids like #field-note and #mill-note alive for paint().
+      if(h3) h3.parentNode.removeChild(h3);
+      if(head && head.classList.contains("row") && head.classList.contains("between")){
+        var keep = [].slice.call(head.children);
+        keep.forEach(function(kid){
+          kid.classList.add("note");
+          bar.insertBefore(kid, bar.querySelector(".up") || bar.querySelector(".fold"));
+        });
+        head.parentNode.removeChild(head);
+      }
+      el.insertBefore(bar, el.firstChild);
+
+      bar.querySelector(".ttl").addEventListener("click", function(){
+        setCollapsed(el, !el.classList.contains("collapsed"));
+      });
+      bar.querySelector(".fold").addEventListener("click", function(){
+        setCollapsed(el, !el.classList.contains("collapsed"));
+      });
+      var up = bar.querySelector(".up"), dn = bar.querySelector(".down");
+      if(up) up.addEventListener("click", function(){ moveMod(el, -1); });
+      if(dn) dn.addEventListener("click", function(){ moveMod(el, 1); });
+      var grip = bar.querySelector(".grip");
+      if(grip) grip.addEventListener("pointerdown", function(ev){ beginDrag(el, grip, ev); });
+    });
+  }
+
+  // Pointer-based drag so a finger works the same as a mouse. touch-action:none
+  // on the grip is what stops the page scrolling out from under the drag.
+  var drag = null;
+  function beginDrag(el, grip, ev){
+    if(ev.button !== undefined && ev.button !== 0) return;
+    ev.preventDefault();
+    drag = {el:el, id:ev.pointerId};
+    el.classList.add("dragging");
+    try{ grip.setPointerCapture(ev.pointerId); }catch(e){}
+  }
+  function duringDrag(ev){
+    if(!drag) return;
+    ev.preventDefault();
+    var host = drag.el.parentNode;
+    var under = document.elementFromPoint(ev.clientX, ev.clientY);
+    if(!under || !under.closest) return;
+    var card = under.closest(".card[data-mod]");
+    if(!card || card === drag.el || card.parentNode !== host) return;
+    var r = card.getBoundingClientRect();
+    host.insertBefore(drag.el, (ev.clientY < r.top + r.height/2) ? card : card.nextSibling);
+  }
+  function endDrag(){
+    if(!drag) return;
+    drag.el.classList.remove("dragging");
+    drag = null;
+    captureOrder();
+  }
+  document.addEventListener("pointermove", duringDrag, {passive:false});
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+
+  // ================= PRICE GRAPH =================
+  // Canvas only. Never rebuilds DOM, so drawing it on every paint is free.
+  var CHART_INK = ["#d9a441","#5FA8D3","#7BC86C","#C77DBB","#E0705F","#9C89E0"];
+  function drawChart(){
+    var cv = $("chart");
+    if(!cv) return;
+    var card = cv.closest ? cv.closest(".card") : null;
+    if(card && card.classList.contains("collapsed")) return;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if(!w || !h) return;
+    var dpr = window.devicePixelRatio || 1;
+    if(cv.width !== Math.round(w*dpr)){ cv.width = Math.round(w*dpr); }
+    if(cv.height !== Math.round(h*dpr)){ cv.height = Math.round(h*dpr); }
+    var x = cv.getContext("2d");
+    if(!x) return;
+    x.setTransform(dpr,0,0,dpr,0,0);
+    x.clearRect(0,0,w,h);
+
+    var set = vendorList().filter(function(c){ return S.hist[c.id] && S.hist[c.id].length > 1; });
+    // Wide enough for the word "ceiling" at 10px, or the labels clip off-canvas.
+    var pad = 48, top = 14, bot = h - 16;
+    function yOf(rel){ return bot - (rel - 0.55)/(1.9 - 0.55)*(bot - top); }
+
+    var mute = getComputedStyle(document.body).getPropertyValue("--ink-2").trim() || "#8a8a8a";
+    x.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+    [[0.6,"floor"],[1,"normal"],[1.85,"ceiling"]].forEach(function(g){
+      var y = yOf(g[0]);
+      x.strokeStyle = mute; x.globalAlpha = .3; x.setLineDash([3,4]);
+      x.beginPath(); x.moveTo(pad, y); x.lineTo(w - 6, y); x.stroke();
+      x.setLineDash([]); x.globalAlpha = .75;
+      x.fillStyle = mute; x.textAlign = "right";
+      x.fillText(g[1], pad - 5, y + 3);
+      x.globalAlpha = 1;
+    });
+
+    set.forEach(function(c, i){
+      var hs = S.hist[c.id], col = CHART_INK[i % CHART_INK.length];
+      x.strokeStyle = col; x.lineWidth = 1.7; x.beginPath();
+      hs.forEach(function(v, j){
+        var px = pad + j/(hs.length - 1)*(w - pad - 8);
+        var py = yOf(v/c.val);
+        j ? x.lineTo(px, py) : x.moveTo(px, py);
+      });
+      x.stroke();
+      var last = hs[hs.length-1];
+      x.fillStyle = col;
+      x.beginPath(); x.arc(w - 8, yOf(last/c.val), 2.5, 0, 6.284); x.fill();
+    });
+
+    x.textAlign = "left";
+    var perRow = Math.max(1, Math.floor((w - pad - 8)/104));
+    set.forEach(function(c, i){
+      x.fillStyle = CHART_INK[i % CHART_INK.length];
+      x.fillText(c.ic + " " + c.nm,
+                 pad + 4 + (i % perRow)*104,
+                 top - 3 + Math.floor(i/perRow)*12);
+    });
+
+    var hot = set.filter(function(c){ return S.price[c.id]/c.val > 1.15; }).length;
+    txt($("chart-note"), set.length
+      ? (hot ? hot + (hot === 1 ? " good day" : " good days") : "nothing spiking")
+      : "no history yet");
+  }
+
+  // ================= DEV CLOCK =================
+  // Date.now is shimmed rather than threading a clock through the game, so every
+  // existing call site accelerates untouched. Autosave stops above 1x: saved
+  // timestamps would be far in the future and a real session would load broken.
+  var REAL_NOW = Date.now.bind(Date);
+  var vNow = REAL_NOW(), vAnchor = REAL_NOW(), timeScale = 1;
+  var devFast = false, saveTimer = null;
+  Date.now = function(){
+    var r = REAL_NOW();
+    vNow += (r - vAnchor)*timeScale;
+    vAnchor = r;
+    return Math.round(vNow);
+  };
+  function setScale(mult){
+    timeScale = mult;
+    if(mult > 1 && !devFast){
+      devFast = true;
+      if(saveTimer){ clearInterval(saveTimer); saveTimer = null; }
+      log("Dev clock on \u2014 autosave stopped so an accelerated run cannot be written over your save.", true);
+    }
+    [].slice.call(document.querySelectorAll(".devbar [data-scale]")).forEach(function(b){
+      b.classList.toggle("on", +b.getAttribute("data-scale") === mult);
+    });
+  }
+  function buildDevBar(){
+    var host = $("devbar-host");
+    if(!host || location.search.indexOf("dev=1") < 0) return;
+    var bar = document.createElement("div");
+    bar.className = "devbar";
+    bar.innerHTML = '<strong class="tiny">Dev clock</strong>'+
+      [1,5,20,60,300].map(function(m){
+        return '<button class="mini'+(m===1?" on":"")+'" data-scale="'+m+'">'+m+"\u00D7</button>";
+      }).join("")+
+      '<span class="tiny" id="dev-note">Runs the whole game faster. Autosave stops above 1\u00D7.</span>';
+    host.appendChild(bar);
+    bar.addEventListener("click", function(ev){
+      var b = ev.target.closest("[data-scale]");
+      if(b) setScale(+b.getAttribute("data-scale"));
+    });
+  }
+
+  function uiBoot(){
+    uiLoadState();
+    buildChrome();
+    applyOrder();
+    everyMod().forEach(function(el){
+      setCollapsed(el, !!ui.collapsed[el.getAttribute("data-mod")]);
+    });
+    buildDevBar();
+  }
 
   boot();
 
