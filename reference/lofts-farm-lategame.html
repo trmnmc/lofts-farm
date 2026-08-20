@@ -252,19 +252,6 @@
       </section>
 
       <section class="card">
-        <div class="row between"><h3>Sell early</h3><span class="tiny" id="fwd-note"></span></div>
-        <div class="hopper" id="forward"></div>
-      </section>
-
-      <section class="card">
-        <div class="row between"><h3>Leaderboard</h3><span class="tiny">everyone can see this</span></div>
-        <div class="scrollx"><table id="board"></table></div>
-        <p class="tiny"><strong>Net worth</strong> is everything you own at today’s prices.
-        <strong>Building</strong> ignores price swings, so a good day on the market does not
-        flatter you and a bad one does not punish you.</p>
-      </section>
-
-      <section class="card">
         <div class="row between"><h3>Market</h3><span class="tiny">Reprices every 3s</span></div>
         <div class="scrollx"><table id="market"></table></div>
       </section>
@@ -371,15 +358,12 @@
   var LEGACY_KEYS = ["lofts-farm-v2", "lofts-farm-v1"];
   var VOL = {wheat:.05, carrot:.06, pumpkin:.09, cane:.11, wart:.15, pitcher:.20};
 
-  // ---------- late game: the ladder past Pitcher ----------
-  // The six above are hand-tuned and stay exactly as they are. Everything from
-  // here is generated at the ratios the existing ladder already implies:
-  // value x2.40 and grow time x1.54 per rung, measured Wheat -> Pitcher.
-  // It stops at seven because rung 8 would need a 1.5-hour grow time.
-  // 0.70 is Pitcher’s own seed-to-value ratio (1120/1600) and it is the price of
-  // the SEED, not of a planting — the seed carries 2, so a planting costs 0.35×
-  // value and clears 0.65×. Charging 0.70 per planting halves that and makes the
-  // whole late ladder worse than the rung below it.
+  // ---------- more seeds, and a shelf that makes room for them ----------
+  // The six above are hand-tuned and untouched. These are generated at the
+  // ratios that ladder already implies, measured Wheat -> Pitcher: value x2.40
+  // and grow time x1.54 per rung. Seed price is Pitcher's own ratio, 0.70 of
+  // value for a seed carrying 2 plantings. Seven of them, because rung 8 would
+  // want a 1.5-hour grow time.
   var LATE_RATIO_VAL = 2.40, LATE_RATIO_GROW = 1.54, LATE_SEED_RATIO = 0.70;
   var LATE = [
     {nm:"Glowcap",       ic:"\u2728",   tk:"GLW", pn:"Glow Syrup",   ptk:"GSY", pic:"\u{1F36F}"},
@@ -391,114 +375,35 @@
     {nm:"Starwheat",     ic:"\u2B50",   tk:"STR", pn:"Star Flour",   ptk:"SFL", pic:"\u{1F31F}"}
   ];
   LATE.forEach(function(t, i){
-    var n = i + 1;
-    var val  = Math.round(1600*Math.pow(LATE_RATIO_VAL,  n));
-    var grow = Math.round(260 *Math.pow(LATE_RATIO_GROW, n));
-    var id   = "late" + n;
+    var k = i + 1;
+    var val  = Math.round(1600*Math.pow(LATE_RATIO_VAL,  k));
+    var grow = Math.round(260 *Math.pow(LATE_RATIO_GROW, k));
+    var id   = "late" + k;
     CROPS.push({id:id, nm:t.nm, ic:t.ic, tk:t.tk,
                 seed: Math.round(val*LATE_SEED_RATIO), grow:grow, val:val, uses:2,
-                lvl: Math.round(12 + n*2.2),
+                lvl: Math.round(12 + k*2.2),
                 pn:t.pn, ptk:t.ptk, pic:t.pic, gen:true});
-    VOL[id] = 0.20;   // capped: above this the price is noise, not a decision
+    VOL[id] = 0.20;
   });
   CROPS.forEach(function(c, i){ c.tier = i+1; C[c.id] = c; });
 
-  // One in, one out. Unlocking a crop retires the one six rungs below it, so
-  // Glowcap replaces Wheat, Emberroot replaces Carrot, and so on down the line.
-  // The merchant therefore always stocks exactly six, and you keep the whole
-  // middle of the ladder rather than losing everything but the newest few.
-  // A retired seed still plants and still trades - it just leaves the shelf.
+  // One in, one out, and the swap is triggered by BUYING the new seed rather
+  // than by reaching the level that unlocks it. Unlocking is something that
+  // happens to you; buying is a choice. So a new seed sits alongside all six
+  // for as long as you like, and only displaces its ancestor once you commit.
+  //
+  // A retired crop is never announced and never taken away: seeds already held
+  // still plant, stock still sells at market. It simply stops being offered and
+  // stops being asked for, so it fades out while the player's attention is on
+  // the new thing.
   var VENDOR_WINDOW = 6;
-  // Retirement is triggered by BUYING the new seed, not by reaching the level
-  // that unlocks it. Unlocking is something that happens to you; buying is a
-  // choice, so the player decides when to give a crop up.
   function boughtEver(id){ return !!(S.bought && S.bought[id]); }
-  function heirOf(c){ return CROPS[c.tier - 1 + VENDOR_WINDOW] || null; }
-  function retiredBy(c){
-    var h = heirOf(c);
-    return (h && boughtEver(h.id)) ? h : null;
+  function retired(c){
+    var heir = CROPS[c.tier - 1 + VENDOR_WINDOW];
+    return !!(heir && boughtEver(heir.id));
   }
-  function retired(c){ return !!retiredBy(c); }
-  // The shelf carries what you have unlocked and not yet replaced. Nothing else -
-  // no locked preview rows.
   function vendorList(){
     return CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
-  }
-
-  // ---------- late game: forward contracts ----------
-  // Promise more than you hold, get paid today's price on all of it with no
-  // market impact, then race to actually produce the difference.
-  var FWD_MULT = 1.5;
-  function fwdCap(id){ return Math.floor(FWD_MULT*(S.prod[id]||0)); }
-  function sellForward(id){
-    if(S.forward || !C[id]) return;
-    var q = fwdCap(id);
-    if(q < 1) return;
-    var u = prodPrice(id);
-    S.forward = {crop:id, qty:q, unit:u, due: Date.now() + C[id].grow*1000};
-    S.cash += u*q;
-    log("Promised "+q+" \u00D7 "+C[id].pn+" at "+money(u)+" each \u2014 "+
-        money(u*q)+" paid up front. Deliver before the clock.", true);
-  }
-  function settleForward(){
-    var f = S.forward;
-    if(!f || Date.now() < f.due) return;
-    var have = S.prod[f.crop]||0, give = Math.min(have, f.qty);
-    S.prod[f.crop] = have - give;
-    var short = f.qty - give;
-    if(short > 0){
-      var u = prodPrice(f.crop), pnl = (f.unit - u)*short;
-      S.cash -= u*short;
-      log("Delivered "+give+" of "+f.qty+" \u2014 bought "+short+" at "+money(u)+" to cover. "+
-          (pnl >= 0 ? "Kept "+money(pnl)+"." : "Cost you "+money(-pnl)+"."), true);
-    } else {
-      log("Forward delivered in full \u2014 "+f.qty+" \u00D7 "+C[f.crop].pn+".", true);
-    }
-    S.forward = null;
-  }
-
-  // ---------- late game: the public board ----------
-  // Net worth is measured at spot. The rate is measured at base value, so that
-  // reinvesting in plots and mills reads as progress and a lucky price swing
-  // does not read as skill.
-  var RIVALS = [{n:"Bramble",eff:1.24},{n:"Corvid",eff:0.71},{n:"Thistle",eff:1.02},
-                {n:"Vane",eff:0.46},{n:"Marrow",eff:1.55}];
-  function freshRivals(){
-    return RIVALS.map(function(r){ return {n:r.n, eff:r.eff, nw:START_CASH, rate:0}; });
-  }
-  function bookValue(){
-    var n = S.cash, k;
-    for(k in S.raw){ if(C[k]) n += (S.raw[k]||0)*C[k].val; }
-    for(k in S.prod){ if(C[k]) n += (S.prod[k]||0)*C[k].val*prodMult(); }
-    return n;
-  }
-  function sampleBook(){
-    var now = Date.now();
-    S.bookHist.push({t:now, v:bookValue()});
-    while(S.bookHist.length > 2 && S.bookHist[0].t < now - 600000) S.bookHist.shift();
-  }
-  function myRate(){
-    var o = S.bookHist[0];
-    if(!o) return 0;
-    var span = Math.max(1000, Date.now() - o.t);
-    return (bookValue() - o.v)/span*60000;
-  }
-  function advanceRivals(dt){
-    // A backwards clock (NTP correction, DST, a user changing it) makes dt
-    // negative, which would run every rival BACKWARDS into six figures of debt.
-    // Cap it at a minute so a long sleep cannot spike them either.
-    dt = Math.min(60000, Math.max(0, dt || 0));
-    var mine = Math.max(0, myRate());
-    S.rivals.forEach(function(r){
-      r.rate = r.rate*0.995 + r.eff*mine*(0.75 + Math.random()*0.5)*0.005;
-      r.nw += r.rate*(dt/60000);
-    });
-  }
-  function boardRows(){
-    var rows = S.rivals.map(function(r){ return {n:r.n, nw:r.nw, rate:r.rate, me:false}; });
-    rows.push({n:"You", nw:netWorth(), rate:myRate(), me:true});
-    rows.sort(function(a,b){ return b.nw - a.nw; });
-    return rows;
   }
 
   var S, lastSig = "";
@@ -531,15 +436,14 @@
   //   and richer output per raw unit (value, not throughput).
   function millSlots(t){ t = t===undefined ? S.millTier : t; return t>=5 ? 3 : (t>=3 ? 2 : 1); }
   function prodMult(t){ t = t===undefined ? S.millTier : t; return PROD_MULT + 0.2*Math.max(0, t-1); }
-  // Below 13 this is the tuned curve and does not move. Above it the curve has
-  // to turn exponential: crop value grows x2.40 a rung while 55*l^1.75 flattens
-  // to a 2% step by level 80, so levels would arrive faster and faster forever.
-  // 1.22 is derived from the ladder's own ratios (2.40 value / 1.54 time, ~2.2
-  // levels a rung) and holds minutes-per-level roughly flat out to level 40.
-  var LATE_XP_BASE = 1.22;
+  // Unchanged at or below 12 - that stretch is tuned. Above it the curve has to
+  // turn exponential, because 55*l^1.75 flattens to a 2% step by level 80 while
+  // each new crop is worth x2.40 the last. Left as it was, levels would arrive
+  // faster and faster forever. 1.22 comes from the ladder's own ratios and holds
+  // minutes-per-level roughly flat out to level 40.
   function xpNeeded(l){
     if(l <= 12) return Math.round(55*Math.pow(l, 1.75));
-    return Math.round(55*Math.pow(12, 1.75)*Math.pow(LATE_XP_BASE, l - 12));
+    return Math.round(55*Math.pow(12, 1.75)*Math.pow(1.22, l - 12));
   }
   function fertCost(c, rem){
     return Math.max(4, Math.round(c.val*0.26*Math.min(1, rem/(c.grow*1000))));
@@ -570,7 +474,7 @@
       plots: [], seeds: {}, raw: {}, prod: {}, price: {}, hist: {}, contracts: [], seq: 0,
       log: [], nextContract: 0, starveTicks: 0, totalTicks: 0, filled: 0, missed: 0,
       fertCount: 0, fertSpend: 0, held: "wheat", savedAt: Date.now(),
-      forward: null, rivals: freshRivals(), bookHist: [], bought: {wheat:true}
+      bought: {wheat:true}
     };
     for(var i=0;i<START_PLOTS;i++) st.plots.push(null);
     CROPS.forEach(function(c){ st.price[c.id] = c.val; st.hist[c.id] = [c.val]; });
@@ -731,7 +635,10 @@
   }
 
   function offerContract(){
-    var avail = CROPS.filter(function(c){ return c.lvl <= S.level; });
+    // Retired crops drop out of the order pool too. This is what makes the
+    // rotation invisible: nothing asks for the old crop any more, so leftover
+    // stock can be sold off at leisure instead of stranding an accepted order.
+    var avail = CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
     if(!avail.length) return;
     var combo = S.level >= COMBO_LEVEL && avail.length >= 2 && Math.random() < 0.38;
     var lines = [], slowest = 0;
@@ -804,18 +711,9 @@
     if(!S.seeds[id]) S.seeds[id] = {n:0, uses:c.uses};
     S.seeds[id].n++;
     if(!S.seeds[S.held] || !S.seeds[S.held].n) S.held = id;
-    var firstBuy = !boughtEver(id);
     if(!S.bought) S.bought = {};
-    S.bought[id] = true;
+    S.bought[id] = true;   // this is what retires the crop six rungs below
     log("Bought a "+c.nm+" seed — "+c.uses+" plantings in it.");
-    if(firstBuy){
-      // Buying the heir is what pushes its ancestor off the shelf.
-      var gone = CROPS[c.tier - 1 - VENDOR_WINDOW];
-      if(gone){
-        log(gone.ic+" "+gone.nm+" leaves the merchant — "+c.ic+" "+c.nm+" takes its slot. "+
-            "Seeds you already hold still plant, and it still sells on the market.", true);
-      }
-    }
   }
   function setHeld(id){ if(S.seeds[id] && S.seeds[id].n > 0) S.held = id; }
   function haveSeed(id){ return !!(S.seeds[id] && S.seeds[id].n > 0); }
@@ -1003,13 +901,7 @@
     while(S.xp >= xpNeeded(S.level)){
       S.xp -= xpNeeded(S.level); S.level++;
       var u = CROPS.filter(function(c){ return c.lvl === S.level; });
-      if(u.length){
-        var doomed = CROPS[u[0].tier - 1 - VENDOR_WINDOW];
-        log("Level "+S.level+". "+u[0].ic+" "+u[0].nm+" seeds now stocked"+
-            (doomed ? " — buying one retires "+doomed.ic+" "+doomed.nm+"." : "."), true);
-      } else {
-        log("Level "+S.level+".", true);
-      }
+      log("Level "+S.level+"."+(u.length ? " "+u[0].ic+" "+u[0].nm+" seeds now stocked." : ""), true);
       if(S.level === COMBO_LEVEL){
         log("Combined orders unlocked — several goods, one deadline, one payout. "+
             "You'll need to hold stock back now.", true);
@@ -1131,71 +1023,6 @@
     return n;
   }
 
-  function structureForward(){
-    var el = $("forward");
-    if(!el) return;
-    if(!S.forward){
-      el.innerHTML = '<div><strong>Nothing promised.</strong></div>'+
-        '<span class="tiny">Dumping a big pile drops the price as you sell it, so only the '+
-        'first few get the good number. Promising is the way round that: hand over up to '+
-        'half again what you are holding, and you are paid today\u2019s price on all of it '+
-        'right now, without moving the market.</span>'+
-        '<span class="tiny">The catch is you owe more than you have, and the clock is running. '+
-        'Grow and mill the rest in time, or buy the shortfall at whatever it costs then. '+
-        'Use the <strong>Promise</strong> button in the market once you are holding a finished good.</span>';
-      txt($("fwd-note"), "None open");
-      return;
-    }
-    var c = C[S.forward.crop];
-    el.innerHTML =
-      '<div class="row between"><span><strong>'+S.forward.qty+" \u00D7 "+c.pic+" "+c.pn+
-        '</strong></span><span class="num" data-fwdpaid="1"></span></div>'+
-      '<span class="tiny">Locked in at <strong>'+money(S.forward.unit)+
-        '</strong> each. Market now <span class="num" data-fwdnow="1"></span>.</span>'+
-      '<span class="tiny">You hold <span class="num" data-fwdhave="1"></span> \u2014 '+
-        '<span data-fwdshort="1"></span></span>'+
-      '<span class="tiny">Time left <strong class="num" data-fwdleft="1"></strong></span>';
-  }
-  function paintForward(){
-    var f = S.forward, el = $("forward");
-    if(!el) return;
-    if(!f){ txt($("fwd-note"), "None open"); return; }
-    var c = C[f.crop], have = S.prod[f.crop]||0, now = prodPrice(f.crop);
-    var short = Math.max(0, f.qty - have), left = f.due - Date.now();
-    txt(el.querySelector("[data-fwdpaid]"), money(f.unit*f.qty)+" banked");
-    txt(el.querySelector("[data-fwdnow]"),  money(now));
-    txt(el.querySelector("[data-fwdhave]"), String(have));
-    var sh = el.querySelector("[data-fwdshort]");
-    if(sh){
-      if(short){
-        var pnl = (f.unit - now)*short;
-        txt(sh, "short "+short+", which would "+
-                (pnl >= 0 ? "still make you "+money(pnl) : "cost you "+money(-pnl))+" right now");
-      } else txt(sh, "covered \u2014 you already have everything you promised");
-    }
-    txt(el.querySelector("[data-fwdleft]"), secs(left));
-    txt($("fwd-note"), short ? "short "+short : "covered");
-  }
-
-  function structureBoard(){
-    var el = $("board");
-    if(!el) return;
-    el.innerHTML = "<thead><tr><th>#</th><th>Farmer</th><th>Net worth</th><th>Building</th></tr></thead><tbody>"+
-      boardRows().map(function(r, i){
-        return '<tr'+(r.me ? ' class="me"' : "")+"><td>"+(i+1)+"</td><td>"+esc(r.n)+"</td>"+
-               '<td class="num" data-bnw="'+esc(r.n)+'"></td>'+
-               '<td class="num" data-brate="'+esc(r.n)+'"></td></tr>';
-      }).join("")+"</tbody>";
-  }
-  function paintBoard(){
-    var el = $("board");
-    if(!el) return;
-    boardRows().forEach(function(r){
-      txt(el.querySelector('[data-bnw="'+r.n+'"]'),   money(r.nw));
-      txt(el.querySelector('[data-brate="'+r.n+'"]'), money(r.rate)+"/min");
-    });
-  }
-
   // ================= RENDERING =================
   // structure() rebuilds DOM. It runs ONLY when the signature below changes, so a
   // click can never be swallowed by a repaint. paint() runs every frame and only
@@ -1215,8 +1042,6 @@
       s.push(c.id + (sd ? sd.n : 0) + ((S.raw[c.id]||0)>0?"r":"") + ((S.prod[c.id]||0)>0?"p":""));
     });
     s.push(S.held);
-    s.push(S.forward ? "F"+S.forward.crop+S.forward.qty : "F-");
-    s.push(boardRows().map(function(r){ return r.n; }).join(","));
     openOrders().forEach(function(k){ s.push(k.id + k.state); });
     return s.join("|");
   }
@@ -1230,7 +1055,6 @@
   function structure(){
     structureStorage(); structureRack(); structurePlots(); structureVendor();
     structureMill(); structureMarket(); structureOrders();
-    structureForward(); structureBoard();
   }
 
   // How much of each good the orders you've accepted are counting on.
@@ -1405,10 +1229,7 @@
       if(np) h += "<tr><td>"+c.pic+" "+c.pn+' <span class="tk">'+c.ptk+"</span></td>"+
            '<td data-ppx="'+c.id+'"></td><td><span class="chip up">×'+prodMult().toFixed(1)+
            '</span></td><td></td><td data-phave="'+c.id+'"></td>'+
-           '<td><button class="mini primary" data-sp="'+c.id+'">Sell</button>'+
-           (!S.forward && fwdCap(c.id) >= 1
-              ? ' <button class="mini" data-fwd="'+c.id+'">Promise '+fwdCap(c.id)+"</button>" : "")+
-           "</td></tr>";
+           '<td><button class="mini primary" data-sp="'+c.id+'">Sell</button></td></tr>';
     });
     $("market").innerHTML = h+"</tbody>";
   }
@@ -1464,7 +1285,6 @@
     txt($("s-mill"), hasMill() ? "T"+S.millTier : "—");
     txt($("s-filled"), S.filled + (S.missed ? " / "+(S.filled+S.missed) : ""));
     txt($("s-net"), money(netWorth()));
-    paintForward(); paintBoard();
     txt($("board-note"), hasMill() && S.totalTicks
       ? "Mill idle "+Math.round(S.starveTicks/S.totalTicks*100)+"% of the time"
       : "Raw orders only until you own a mill");
@@ -1687,7 +1507,6 @@
     ["data-stopall", function(){ stopAll(); }],
     ["data-sr",      function(v){ sellRaw(v); }],
     ["data-sp",      function(v){ sellProd(v); }],
-    ["data-fwd",     function(v){ sellForward(v); }],
     ["data-take",    function(v){ takeContract(v); }],
     ["data-drop",    function(v){ dropContract(v); }],
     ["data-deliver", function(v){ deliverNow(v); }]
@@ -1718,7 +1537,6 @@
       offerContract();
     }
     settleContracts();
-    sampleBook(); advanceRivals(dt); settleForward();
     sync(false);
   }
 
@@ -1730,23 +1548,17 @@
       S.held = first ? first.id : "wheat";
     }
     S.filled = S.filled||0; S.missed = S.missed||0;
-    // Saves written before the late game exists have none of these, and none of
-    // the new crops in their price table.
-    if(S.forward === undefined) S.forward = null;
     if(!S.bought){
-      // Older saves never tracked purchases. Infer from what is already held or
-      // planted, so nothing retires retroactively for a crop never bought.
+      // Saves predating rotation never tracked purchases. Infer from seeds held
+      // and crops in the ground, so nothing retires for a crop never bought.
       S.bought = {};
       CROPS.forEach(function(c){ if(S.seeds[c.id] && S.seeds[c.id].n) S.bought[c.id] = true; });
       S.plots.forEach(function(p){ if(p) S.bought[p.crop] = true; });
     }
-    if(!S.rivals || !S.rivals.length) S.rivals = freshRivals();
-    if(!S.bookHist || !S.bookHist.length) S.bookHist = [];
     CROPS.forEach(function(c){
-      if(typeof S.price[c.id] !== "number"){ S.price[c.id] = c.val; }
-      if(!S.hist[c.id] || !S.hist[c.id].length){ S.hist[c.id] = [c.val]; }
+      if(typeof S.price[c.id] !== "number") S.price[c.id] = c.val;
+      if(!S.hist[c.id] || !S.hist[c.id].length) S.hist[c.id] = [c.val];
     });
-    sampleBook();
     S.starveTicks = S.starveTicks||0; S.totalTicks = S.totalTicks||0;
 
     if(loaded){
@@ -1859,17 +1671,14 @@
 
   boot();
 
-  // Test affordance only: ?debug=1 exposes the internals so the design can be
-  // driven and measured from outside. Absent without the query flag.
+  // Measurement only. Absent unless ?debug=1 is on the URL.
   if(location.search.indexOf("debug=1") >= 0){
     window.__lofts = {
       get S(){ return S; }, set S(v){ S = v; },
-      CROPS:CROPS, C:C, VOL:VOL, fresh:fresh, tick:tick, sync:sync, save:save,
+      CROPS:CROPS, C:C, fresh:fresh, tick:tick, sync:sync, save:save, signature:signature,
       xpNeeded:xpNeeded, gainXp:gainXp, plant:plant, harvest:harvest, buySeed:buySeed,
-      sellRaw:sellRaw, sellProd:sellProd, sellForward:sellForward, settleForward:settleForward,
-      fwdCap:fwdCap, vendorList:vendorList, boardRows:boardRows, myRate:myRate,
-      bookValue:bookValue, netWorth:netWorth, fertCost:fertCost, millCost:millCost,
-      prodMult:prodMult, prodPrice:prodPrice, spot:spot, repriceAll:repriceAll
+      vendorList:vendorList, retired:retired, offerContract:offerContract,
+      netWorth:netWorth, fertCost:fertCost, spot:spot, prodPrice:prodPrice
     };
   }
 })();
