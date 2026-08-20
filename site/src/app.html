@@ -320,7 +320,8 @@
     <p class="tiny">This is your whole farm as text. Copy it somewhere safe before you stop playing.
     Paste one back in and press Load to restore that farm — it works even if browser storage is
     wiped or the page is republished.</p>
-    <textarea id="code-box" spellcheck="false"
+    <textarea id="code-box" spellcheck="false" autocapitalize="off"
+      autocorrect="off" autocomplete="off" translate="no"
       style="width:100%;min-height:130px;font-family:var(--f-data);font-size:11px;
              padding:9px;border:1px solid var(--line);border-radius:var(--r);
              background:var(--panel-2);color:var(--ink);resize:vertical"></textarea>
@@ -555,20 +556,104 @@
     try{ return "LOFT1:" + btoa(unescape(encodeURIComponent(json))); }
     catch(e){ return "LOFT0:" + json; }
   }
-  function decodeSave(code){
-    code = (code||"").trim();
-    var json;
-    if(code.indexOf("LOFT1:") === 0){
-      try{ json = decodeURIComponent(escape(atob(code.slice(6)))); }
-      catch(e){ return null; }
-    } else if(code.indexOf("LOFT0:") === 0){
-      json = code.slice(6);
-    } else { json = code; }
-    try{
-      var st = JSON.parse(json);
-      return (st && st.plots) ? migrate(st) : null;
-    }catch(e){ return null; }
+  // Save codes travel by phone: notes apps, chat threads, mail, QR, URLs, and
+  // each mangles base64 its own way. The dangerous one is "+" becoming a space,
+  // because atob DROPS spaces instead of failing -- every byte after it shifts
+  // and the farm is silently lost. Others: the URL-safe -/_ spelling, hard
+  // wrapping, non-breaking spaces, zero-width characters from rich text.
+  //
+  // So do not trust one spelling. Try the plausible repairs and keep the first
+  // that yields real JSON. A wrong guess cannot corrupt anything: it just fails
+  // to parse and the next candidate is tried.
+  function isInvisible(c){
+    return c === 0x200B || c === 0x200C || c === 0x200D || c === 0x2060 || c === 0xFEFF;
   }
+  function isBreak(c){
+    return c === 0x0A || c === 0x0D || c === 0x09 || c === 0x0B || c === 0x0C;
+  }
+  function isSpace(c){
+    return c === 0x20 || c === 0xA0 || c === 0x1680 || (c >= 0x2000 && c <= 0x200A) ||
+           c === 0x202F || c === 0x205F || c === 0x3000;
+  }
+  function scrub(str, spaceAsPlus){
+    var out = "";
+    for(var i=0;i<str.length;i++){
+      var c = str.charCodeAt(i);
+      if(isInvisible(c) || isBreak(c)) continue;
+      if(isSpace(c)){ if(spaceAsPlus) out += "+"; continue; }
+      out += str.charAt(i);
+    }
+    return out;
+  }
+  // Strips only what is never meaningful, so the space repair still has spaces
+  // to work with. Internal spaces survive to b64Candidates on purpose.
+  function preclean(str){
+    var out = "";
+    for(var i=0;i<str.length;i++){
+      var c = str.charCodeAt(i);
+      if(isInvisible(c) || isBreak(c)) continue;
+      out += str.charAt(i);
+    }
+    while(out.length && isSpace(out.charCodeAt(0))) out = out.slice(1);
+    while(out.length && isSpace(out.charCodeAt(out.length-1))) out = out.slice(0,-1);
+    return out;
+  }
+  function repad(v){
+    while(v.length && v.charAt(v.length-1) === "=") v = v.slice(0, -1);
+    var r = v.length % 4;
+    if(r === 1) return null;                 // never a valid base64 length
+    if(r === 2) return v + "==";
+    if(r === 3) return v + "=";
+    return v;
+  }
+  function b64Candidates(body){
+    var out = [], seen = {};
+    [scrub(body, false), scrub(body, true)].forEach(function(v){
+      [v, v.split("-").join("+").split("_").join("/")].forEach(function(w){
+        var padded = repad(w);
+        if(padded && !seen[padded]){ seen[padded] = 1; out.push(padded); }
+      });
+    });
+    return out;
+  }
+  function tagOf(raw){
+    var head = raw.slice(0, 6).toUpperCase();
+    if(head === "LOFT1:") return {ver:1, body: raw.slice(6)};
+    if(head === "LOFT0:") return {ver:0, body: raw.slice(6)};
+    return {ver:-1, body: raw};
+  }
+  // Returns {state, why}. why is player-facing, and only set when state is null.
+  function readSave(code){
+    var raw = preclean(code || "");
+    if(!raw) return {state:null, why:"The box is empty - paste your code in first."};
+
+    var t = tagOf(raw), texts = [], sawBase64 = false;
+    if(t.ver === 0){
+      texts.push(t.body);
+    } else {
+      if(t.ver === -1) texts.push(t.body);        // bare JSON
+      b64Candidates(t.body).forEach(function(v){
+        try{ texts.push(decodeURIComponent(escape(atob(v)))); sawBase64 = true; }catch(e){}
+      });
+    }
+
+    for(var i=0;i<texts.length;i++){
+      try{
+        var st = JSON.parse(texts[i]);
+        if(st && st.plots) return {state: migrate(st), why:null};
+      }catch(e){}
+    }
+
+    var why;
+    if(t.ver === -1)
+      why = "That code is missing its LOFT1: start - copy the whole thing, including LOFT1:.";
+    else if(!sawBase64)
+      why = "That code has characters that are not part of a save code - try copying it again.";
+    else
+      why = "That code was cut off partway - copy all of it, from LOFT1: to the very end.";
+    return {state:null, why:why};
+  }
+  function decodeSave(code){ return readSave(code).state; }
   // Older saves stored one good per order. Bring them forward rather than dropping them.
   function migrate(st){
     st.price = st.price || {};
@@ -1717,8 +1802,9 @@
     }
   });
   $("code-load").addEventListener("click", function(){
-    var st = decodeSave($("code-box").value);
-    if(!st){ txt($("code-msg"), "That doesn't look like a save code."); return; }
+    var res = readSave($("code-box").value);
+    if(!res.state){ txt($("code-msg"), res.why); return; }
+    var st = res.state;
     S = st; S.restoredFrom = null;
     save();
     $("welcome").innerHTML = '<div class="banner"><strong>Farm restored from a save code.</strong> '+
