@@ -3,13 +3,9 @@
   "configurations": [
     {
       "name": "lofts-farm",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "C:/Users/truman/AppData/Local/Temp/claude/C--Users-truman-OneDrive-Documents-Minecraft-Server/3f7fffd3-72f5-4b5e-b5b0-24929097781e/scratchpad/serve.js",
-        "C:/Users/truman/AppData/Local/Temp/claude/C--Users-truman-OneDrive-Documents-Minecraft-Server/3f7fffd3-72f5-4b5e-b5b0-24929097781e/scratchpad",
-        "8770"
-      ],
-      "port": 8770
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "--config", "site/wrangler.jsonc", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

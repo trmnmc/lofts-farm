@@ -1,0 +1,18 @@
+{
+  "name": "lofts-farm-site",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Lofts Farm economy sim — static site hosted on Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "whoami": "wrangler whoami"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260815.1": true
+  }
+}
