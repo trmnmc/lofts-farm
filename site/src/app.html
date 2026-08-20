@@ -317,6 +317,7 @@
   <div class="stack g12">
     <h3>Save code</h3>
     <p class="tiny" id="code-status"></p>
+    <p class="tiny" id="code-build" style="color:var(--ink-3)"></p>
     <p class="tiny">This is your whole farm as text. Copy it somewhere safe before you stop playing.
     Paste one back in and press Load to restore that farm — it works even if browser storage is
     wiped or the page is republished.</p>
@@ -1783,6 +1784,7 @@
   $("btn-code").addEventListener("click", function(){
     $("code-box").value = encodeSave();
     txt($("code-msg"), "");
+    txt($("code-build"), "build __BUILD__");
     txt($("code-status"), storageOK
       ? "Autosave is working in this browser — but it does not survive the page being republished. "+
         "Keep a code anyway."
@@ -1802,8 +1804,14 @@
     }
   });
   $("code-load").addEventListener("click", function(){
-    var res = readSave($("code-box").value);
-    if(!res.state){ txt($("code-msg"), res.why); return; }
+    var rawIn = $("code-box").value || "";
+    var res = readSave(rawIn);
+    if(!res.state){
+      var head = rawIn.slice(0, 10), tail = rawIn.slice(-6);
+      txt($("code-msg"), res.why + "  [got " + rawIn.length + " chars, " +
+          (head ? head : "nothing") + " ... " + tail + "]");
+      return;
+    }
     var st = res.state;
     S = st; S.restoredFrom = null;
     save();
