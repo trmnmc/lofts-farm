@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "description": "Lofts Farm economy sim — static site hosted on Cloudflare Workers",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "build": "node build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
     "whoami": "wrangler whoami"
   },
   "devDependencies": {
