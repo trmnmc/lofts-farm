@@ -411,17 +411,11 @@
   // The six above are hand-tuned and untouched. These are generated at the
   // ratios that ladder already implies, measured Wheat -> Pitcher: value x2.40
   // and grow time x1.54 per rung. Seed price is Pitcher's own ratio, 0.70 of
-  // value for a seed carrying 2 plantings. Seven of them, because rung 8 would
-  // want a 1.5-hour grow time.
+  // value for a seed carrying 2 plantings. Exactly one of them: the shelf
+  // never shows more than a single rung past Pitcher.
   var LATE_RATIO_VAL = 2.40, LATE_RATIO_GROW = 1.54, LATE_SEED_RATIO = 0.70;
   var LATE = [
-    {nm:"Glowcap",       ic:"\u2728",   tk:"GLW", pn:"Glow Syrup",   ptk:"GSY", pic:"\u{1F36F}"},
-    {nm:"Emberroot",     ic:"\u{1F525}",tk:"EMB", pn:"Ember Oil",    ptk:"EOL", pic:"\u{1FAD9}"},
-    {nm:"Voidmelon",     ic:"\u{1F311}",tk:"VDM", pn:"Void Essence", ptk:"VES", pic:"\u{1F52E}"},
-    {nm:"Rimeflower",    ic:"\u2744",   tk:"RME", pn:"Rime Powder",  ptk:"RPW", pic:"\u{1F9CA}"},
-    {nm:"Sunspire Gourd",ic:"\u2600",   tk:"SUN", pn:"Sun Nectar",   ptk:"SNC", pic:"\u{1F376}"},
-    {nm:"Aetherstalk",   ic:"\u{1F32A}",tk:"AET", pn:"Aether Resin", ptk:"ARS", pic:"\u{1F48E}"},
-    {nm:"Starwheat",     ic:"\u2B50",   tk:"STR", pn:"Star Flour",   ptk:"SFL", pic:"\u{1F31F}"}
+    {nm:"Glowcap",       ic:"\u2728",   tk:"GLW", pn:"Glow Syrup",   ptk:"GSY", pic:"\u{1F36F}"}
   ];
   LATE.forEach(function(t, i){
     var k = i + 1;
@@ -445,12 +439,12 @@
   // still plant, stock still sells at market. It simply stops being offered and
   // stops being asked for, so it fades out while the player's attention is on
   // the new thing.
-  var VENDOR_WINDOW = 6;
+  // Nothing is ever taken off the shelf. The six hand-tuned crops stay on offer
+  // for the whole game, and Glowcap is the single rung past Pitcher, so the
+  // vendor tops out at seven rows. S.bought is still tracked for save
+  // compatibility, it just no longer displaces anything.
   function boughtEver(id){ return !!(S.bought && S.bought[id]); }
-  function retired(c){
-    var heir = CROPS[c.tier - 1 + VENDOR_WINDOW];
-    return !!(heir && boughtEver(heir.id));
-  }
+  function retired(){ return false; }
   function vendorList(){
     return CROPS.filter(function(c){ return c.lvl <= S.level && !retired(c); });
   }
@@ -624,6 +618,26 @@
     if(!Array.isArray(st.plots) || !st.plots.length){
       st.plots = []; for(var i=0;i<START_PLOTS;i++) st.plots.push(null);
     }
+
+    // The ladder can lose a crop between builds. Any id the current CROPS list
+    // no longer knows shows up as C[id] === undefined deep inside a render and
+    // throws, which blanks the whole shelf. Drop stale references on load
+    // instead, so an old save degrades quietly rather than breaking.
+    ["price","hist","seeds","raw","prod","keep","bought"].forEach(function(f){
+      if(!st[f] || typeof st[f] !== "object") return;
+      Object.keys(st[f]).forEach(function(id){ if(!C[id]) delete st[f][id]; });
+    });
+    st.plots = st.plots.map(function(pl){ return (pl && !C[pl.crop]) ? null : pl; });
+    st.plotLast = st.plotLast.filter(function(id){ return !!C[id]; });
+    if(Array.isArray(st.contracts)){
+      st.contracts = st.contracts.filter(function(k){
+        if(!k || !Array.isArray(k.lines)) return false;
+        return k.lines.every(function(l){ return l && !!C[l.crop]; });
+      });
+    }
+    if(!C[st.held]) st.held = "wheat";
+    if(!st.seeds.wheat) st.seeds.wheat = {n:0, uses:C.wheat.uses};
+
     return st;
   }
   function spotOr(id){ return C[id] ? C[id].val : 0; }
@@ -774,7 +788,7 @@
     S.seeds[id].n++;
     if(!S.seeds[S.held] || !S.seeds[S.held].n) S.held = id;
     if(!S.bought) S.bought = {};
-    S.bought[id] = true;   // this is what retires the crop six rungs below
+    S.bought[id] = true;
     log("Bought a "+c.nm+" seed — "+c.uses+" plantings in it.");
   }
   function setHeld(id){ if(S.seeds[id] && S.seeds[id].n > 0) S.held = id; }
